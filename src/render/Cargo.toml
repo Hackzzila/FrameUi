@@ -1,0 +1,24 @@
+[package]
+name = "render"
+version = "0.1.0"
+authors = ["Hackzzila <admin@hackzzila.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "lib.rs"
+
+[features]
+debug = ["webrender/capture", "webrender/debugger", "webrender/profiler"]
+c-render = []
+
+[dependencies]
+euclid = "0.20"
+gleam = "0.12"
+webrender = { git = "https://github.com/servo/webrender" }
+winit = "0.22"
+log = "0.4"
+dom = { path = "../dom" }
+yoga = { path = "../yoga" }
+

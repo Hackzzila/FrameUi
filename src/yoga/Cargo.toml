@@ -1,0 +1,19 @@
+[package]
+name = "yoga"
+version = "0.1.0"
+authors = ["Hackzzila <admin@hackzzila.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+paste = "0.1"
+bitflags = "1.2"
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+bindgen = "0.54"

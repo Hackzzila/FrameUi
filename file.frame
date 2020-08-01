@@ -1,0 +1,10 @@
+<Frame>
+  <Head>
+    <Style src="file.css"/>
+  </Head>
+  <Body>
+    <Unstyled class="foo" id="id">
+      <Unstyled class="two"></Unstyled>
+    </Unstyled>
+  </Body>
+</Frame>

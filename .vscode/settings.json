@@ -1,0 +1,7 @@
+{
+  "rust-analyzer.cargo.allFeatures": true,
+  "files.associations": {
+    "*.frame": "xml",
+    "array": "cpp"
+  }
+}

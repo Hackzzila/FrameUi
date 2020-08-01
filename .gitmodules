@@ -1,0 +1,9 @@
+[submodule "src/devtools-protocol/devtools-protocol"]
+	path = src/devtools-protocol/devtools-protocol
+	url = https://github.com/ChromeDevTools/devtools-protocol.git
+[submodule "src/sass/libsass"]
+	path = src/sass/libsass
+	url = https://github.com/sass/libsass.git
+[submodule "src/yoga/yoga"]
+	path = src/yoga/yoga
+	url = https://github.com/facebook/yoga.git

@@ -1,0 +1,56 @@
+[package]
+name = "project-a"
+version = "0.1.0"
+authors = ["Hackzzila <admin@hackzzila.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "project-a"
+required-features = ["r-winit-adapter", "r-compiler", "r-chrome_devtools"]
+
+[workspace]
+members = [
+  "src/chrome_devtools",
+  "src/compiler",
+  "src/devtools-protocol",
+  "src/dom",
+  "src/render",
+  "src/sass",
+  "src/spec",
+  "src/style",
+  "src/winit-adapter",
+  "src/yoga",
+
+  "tools/docgen"
+]
+
+[features]
+default = []
+r-chrome_devtools = ["chrome_devtools"]
+r-compiler = ["compiler"]
+r-dom = ["dom"]
+r-event = ["event"]
+c-event = ["r-event", "event/c-event"]
+r-render = ["render"]
+c-render = ["r-render", "render/c-render"]
+r-winit-adapter = ["winit-adapter"]
+# c-api = ["render/c-api"]
+
+[dependencies]
+dom = { path = "src/dom", optional = true }
+compiler = { path = "src/compiler", optional = true }
+chrome_devtools = { path = "src/chrome_devtools", optional = true }
+event = { path = "src/event", optional = true }
+render = { path = "src/render", optional = true, features = ["debug"] }
+winit-adapter = { path = "src/winit-adapter", optional = true }
+
+yoga = { path = "src/yoga" }
+sass = { path = "src/sass" }
+spec = { path = "src/spec" }
+
+pretty_env_logger = "0.4"

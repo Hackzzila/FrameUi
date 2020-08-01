@@ -1,0 +1,16 @@
+language = "C"
+cpp_compat = true
+includes = ["generated.h"]
+header = "#define CF_SWIFT_NAME(_name)"
+
+[parse]
+parse_deps = true
+include = ["euclid", "event", "render", "chrome_devtools", "compiler", "dom"]
+extra_bindings = ["event", "render", "chrome_devtools", "compiler", "dom"]
+
+[defines]
+"feature = c-event" = "MODULE_EVENT"
+"feature = c-render" = "MODULE_RENDER"
+
+[fn]
+swift_name_macro = "CF_SWIFT_NAME"

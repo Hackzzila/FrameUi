@@ -1,0 +1,25 @@
+[package]
+name = "dom"
+version = "0.1.0"
+authors = ["Hackzzila <admin@hackzzila.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = []
+devtools = ["dashmap"]
+
+[dependencies]
+dashmap = { version = "3.11", optional = true }
+indextree = { version = "4.2", features = ["deser"] }
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+spec = { path = "../spec" }
+style = { path = "../style" }
+yoga = { path = "../yoga" }
+selectors = "0.22"
+cssparser = "0.27"

@@ -1,0 +1,109 @@
+use std::{
+  ffi::CString,
+  os::raw::{c_void, c_char},
+};
+
+use gleam::gl;
+
+use super::*;
+
+#[doc="module=render"]
+pub struct Gl;
+
+#[doc="module=render"]
+pub type GlLoadFunc = extern fn(symbol: *const c_char) -> *const c_void;
+
+impl Gl {
+  #[no_mangle]
+  #[doc="module=render,index=0"]
+  pub unsafe extern fn Gl_load_gl(func: GlLoadFunc) -> *mut Gl {
+    let gl = gl::GlFns::load_with(|symbol| {
+      let string = CString::new(symbol).unwrap();
+      func(string.as_ptr())
+    });
+
+    Box::into_raw(Box::new(gl)) as *mut _
+  }
+
+  #[no_mangle]
+  #[doc="module=render,index=1"]
+  pub unsafe extern fn Gl_load_gles(func: GlLoadFunc) -> *mut Gl {
+    let gl = gl::GlesFns::load_with(|symbol| {
+      let string = CString::new(symbol).unwrap();
+      func(string.as_ptr())
+    });
+
+    Box::into_raw(Box::new(gl)) as *mut _
+  }
+}
+
+pub struct Notifier;
+
+impl RenderNotifier for Notifier {
+  fn clone(&self) -> Box<dyn RenderNotifier> {
+    Box::new(Notifier)
+  }
+
+  fn wake_up(&self) {
+    // #[cfg(not(target_os = "android"))]
+    // let _ = self.events_proxy.wakeup();
+    // let _ = self.events_proxy.send_event(());
+    // panic!("foo");
+  }
+
+  fn new_frame_ready(
+    &self,
+    _: DocumentId,
+    _scrolled: bool,
+    _composite_needed: bool,
+    _render_time: Option<u64>
+  ) {
+    // self.wake_up();
+    // panic!("bar");
+  }
+}
+
+// #[doc="module=render"]
+// pub type Renderer = super::Renderer;
+
+#[allow(non_snake_case)]
+impl Renderer {
+  #[no_mangle]
+  #[doc="module=render,index=0"]
+  pub unsafe extern fn Renderer_new(
+    gl: *mut Gl,
+    device_pixel_ratio: f32,
+    device_size: DeviceSize,
+  ) -> *mut Self {
+    let gl = *Box::from_raw(gl as *mut _);
+
+    let renderer = Renderer::new(gl, device_pixel_ratio, device_size, Box::new(Notifier));
+
+    Box::into_raw(Box::new(renderer))
+  }
+
+  #[no_mangle]
+  #[doc="module=render,index=1"]
+  pub unsafe extern fn Renderer_drop(&mut self) {
+    let renderer = Box::from_raw(self as *mut Self);
+    renderer.deinit();
+  }
+
+  #[no_mangle]
+  #[doc="module=render,index=2"]
+  pub unsafe extern fn Renderer_set_device_size(&mut self, size: DeviceSize) {
+    self.set_device_size(size);
+  }
+
+  #[no_mangle]
+  #[doc="module=render,index=3"]
+  pub unsafe extern fn Renderer_set_scale_factor(&mut self, scale: f32) {
+    self.set_scale_factor(scale);
+  }
+
+  #[no_mangle]
+  #[doc="module=render,index=4"]
+  pub unsafe extern fn Renderer_render(&mut self, inner: bool) {
+    self.render(inner);
+  }
+}

@@ -1,0 +1,21 @@
+:root {
+  width: 50%;
+  height: 75%;
+  background-color: white;
+}
+
+#id {
+  width: 50%;
+  height: 50%;
+  background-color: black;
+}
+
+.two {
+  width: 1000px;
+  height: 50%;
+  background-color: rgba(0, 0, 255, 0.5);
+}
+
+bar {
+  width: 10px;
+}
