@@ -1,5 +1,6 @@
 use std::env;
 use std::path::PathBuf;
+
 #[derive(Debug)]
 struct BindgenCallbacks;
 
@@ -52,7 +53,6 @@ fn main() {
     .whitelist_type("YG.*")
     .whitelist_var("YG.*")
     .whitelist_function("YG.*")
-    // .parse_callbacks(Box::new(bindgen::CargoCallbacks))
     .parse_callbacks(Box::new(BindgenCallbacks))
     .generate()
     .expect("Unable to generate bindings");

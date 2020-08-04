@@ -3,6 +3,7 @@ import VueRouter from 'vue-router';
 import Base from '../views/Base.vue';
 import Home from '../views/Home.vue';
 import Docs from '../views/Docs.vue';
+import CSS from '../views/CSS.vue';
 import Layout from '../views/Layout.vue';
 import Reference from '../views/Reference.vue';
 import ReferenceHome from '../views/ReferenceHome.vue';
@@ -33,6 +34,12 @@ const routes = [
         path: 'docs/layout',
         name: 'Layout',
         component: Layout,
+        props: true,
+      },
+      {
+        path: 'docs/css',
+        name: 'CSS',
+        component: CSS,
         props: true,
       },
       {
