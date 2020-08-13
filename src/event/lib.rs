@@ -50,7 +50,7 @@ impl<W: Windowing> EventHandler<W> {
 
     match event {
       Event::Resized(size) => {
-        self.renderer.set_device_size(size.into());
+        self.renderer.set_device_size(size);
         render_inner = true;
       }
 

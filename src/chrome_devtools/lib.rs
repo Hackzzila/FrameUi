@@ -54,14 +54,14 @@ fn node_from_element(node_id: NodeId, parent: Option<NodeId>, elements: &Arena<E
   let node_value = String::new();
 
   dt::dom::Node {
-    node_id: Box::new(Into::<usize>::into(node_id) as i64),
-    backend_node_id: Box::new(Into::<usize>::into(node_id) as i64),
+    node_id: Into::<usize>::into(node_id) as i64,
+    backend_node_id: Into::<usize>::into(node_id) as i64,
     node_type: node_type as i64,
     local_name: node_name.clone(),
-    node_name: node_name,
-    node_value: node_value,
-    children: Some(children.into_iter().map(|x| Box::new(x)).collect()),
-    parent_id: parent.map(|x| Box::new(Into::<usize>::into(x) as i64)),
+    node_name,
+    node_value,
+    children: Some(children),
+    parent_id: parent.map(|x| Into::<usize>::into(x) as i64),
 
     attributes: None,
     base_url: None,

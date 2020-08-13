@@ -319,7 +319,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
             .map_err(handle_error_with_location!(self, file_id, reader))?;
 
           if name == "Frame" {
-            if found_frame == true {
+            if found_frame {
               panic!("found duplicate frame");
             }
 
@@ -366,7 +366,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
 
           match name {
             "Head" => {
-              if found_head == true {
+              if found_head {
                 panic!("found duplicate head");
               }
               found_head = true;
@@ -374,7 +374,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
             }
 
             "Body" => {
-              if found_body == true {
+              if found_body {
                 panic!("found duplicate body");
               }
               found_body = true;

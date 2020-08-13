@@ -128,7 +128,7 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
               }
 
               cssparser::BasicParseErrorKind::EndOfInput => {
-                Label::primary(file_id, pos..pos).with_message(format!("end of input"))
+                Label::primary(file_id, pos..pos).with_message("end of input".to_string())
               }
 
               cssparser::BasicParseErrorKind::AtRuleInvalid(rule) => {
@@ -137,11 +137,11 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
               }
 
               cssparser::BasicParseErrorKind::AtRuleBodyInvalid => {
-                Label::primary(file_id, pos..pos).with_message(format!("at-rule body invalid"))
+                Label::primary(file_id, pos..pos).with_message("at-rule body invalid".to_string())
               }
 
               cssparser::BasicParseErrorKind::QualifiedRuleInvalid => {
-                Label::primary(file_id, pos..pos).with_message(format!("qualified rule invalid"))
+                Label::primary(file_id, pos..pos).with_message("qualified rule invalid".to_string())
               }
             },
 
@@ -203,13 +203,9 @@ fn main() {
     .get_matches();
 
   let mut printer = DiagnosticPrinter::new();
-  let v = compile(&Path::new(matches.value_of("INPUT").unwrap()), &mut printer);
-  match v {
-    Ok(doc) => {
-      let f = std::fs::File::create(matches.value_of("output").unwrap()).unwrap();
-      doc.save_into(f);
-    }
-
-    Err(..) => {}
+  let result = compile(&Path::new(matches.value_of("INPUT").unwrap()), &mut printer);
+  if let Ok(doc) = result {
+    let f = std::fs::File::create(matches.value_of("output").unwrap()).unwrap();
+    doc.save_into(f);
   }
 }

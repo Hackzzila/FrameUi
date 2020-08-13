@@ -226,29 +226,23 @@ impl<'a> selectors::Element for MatchingElement<'a> {
   }
 
   fn parent_element(&self) -> Option<Self> {
-    self.node.parent().and_then(|parent| {
-      Some(Self {
-        elements: self.elements,
-        node: &self.elements[parent],
-      })
+    self.node.parent().map(|parent| Self {
+      elements: self.elements,
+      node: &self.elements[parent],
     })
   }
 
   fn prev_sibling_element(&self) -> Option<Self> {
-    self.node.previous_sibling().and_then(|prev| {
-      Some(Self {
-        elements: self.elements,
-        node: &self.elements[prev],
-      })
+    self.node.previous_sibling().map(|prev| Self {
+      elements: self.elements,
+      node: &self.elements[prev],
     })
   }
 
   fn next_sibling_element(&self) -> Option<Self> {
-    self.node.next_sibling().and_then(|next| {
-      Some(Self {
-        elements: self.elements,
-        node: &self.elements[next],
-      })
+    self.node.next_sibling().map(|next| Self {
+      elements: self.elements,
+      node: &self.elements[next],
     })
   }
 

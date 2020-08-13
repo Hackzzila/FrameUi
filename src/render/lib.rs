@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use euclid::{vec2, Size2D};
+use euclid::Size2D;
 use gleam::gl::Gl;
 use std::rc::Rc;
 use webrender::{

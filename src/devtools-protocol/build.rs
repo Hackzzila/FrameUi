@@ -138,9 +138,9 @@ enum DomainTypeData {
   Boolean,
 }
 
-fn array_type_to_inner(items: RefTypeOr<ArrayItemType>) -> TokenStream {
+fn array_type_to_inner(items: &RefTypeOr<ArrayItemType>, domain: &str, domains: &[ProtocolDomain]) -> TokenStream {
   match items {
-    RefTypeOr::Ref(reference) => ref_to_type(reference),
+    RefTypeOr::Ref(reference) => ref_to_type(reference, domain, domains, true),
 
     RefTypeOr::Other(other) => match other {
       ArrayItemType::Number => quote!(f64),
@@ -166,25 +166,47 @@ fn array_type_to_inner(items: RefTypeOr<ArrayItemType>) -> TokenStream {
   }
 }
 
-fn ref_to_type(reference: RefType) -> TokenStream {
-  let name = reference.r#ref;
-  if name.contains(".") {
-    let mut split = name.split(".");
+fn ref_to_type(reference: &RefType, current_domain: &str, domains: &[ProtocolDomain], in_vec: bool) -> TokenStream {
+  let name = &reference.r#ref;
+  let (ns, name) = if name.contains('.') {
+    let mut split = name.split('.');
     let ns = split.next().unwrap();
     let name = split.next().unwrap();
 
-    let ns = format_ident!("{}", ns.to_lowercase());
-    let ident = format_ident!("{}", name);
-    quote!(Box<super::#ns::#ident>)
+    (ns, name)
   } else {
-    let ident = format_ident!("{}", name);
-    quote!(Box<#ident>)
+    (current_domain, name.as_str())
+  };
+
+  let domain = domains.iter().find(|x| x.domain == ns).unwrap();
+  let ty = domain.types.as_ref().unwrap().iter().find(|x| x.id == name).unwrap();
+
+  let ns = format_ident!("{}", ns.to_lowercase());
+  let ident = format_ident!("{}", name);
+  match &ty.data {
+    DomainTypeData::Object(..) if !in_vec => quote!(Box<super::#ns::#ident>),
+    _ => quote!(super::#ns::#ident),
   }
+
+  // panic!("{:#?}", ty);
+
+  // if name.contains('.') {
+  //   let mut split = name.split('.');
+  //   let ns = split.next().unwrap();
+  //   let name = split.next().unwrap();
+
+  //   let ns = format_ident!("{}", ns.to_lowercase());
+  //   let ident = format_ident!("{}", name);
+  //   quote!(Box<super::#ns::#ident>)
+  // } else {
+  //   let ident = format_ident!("{}", name);
+  //   quote!(Box<#ident>)
+  // }
 }
 
-fn generate_enum(ident: &Ident, description: String, variants: Vec<String>) -> TokenStream {
+fn generate_enum(ident: &Ident, description: String, variants: &[String]) -> TokenStream {
   let variants = variants.iter().map(|x| {
-    if x.contains("-") {
+    if x.contains('-') {
       let ident = format_ident!("r#{}", x.replace("-", "_"));
       quote!(
         #[serde(rename = #x)]
@@ -208,20 +230,22 @@ fn generate_enum(ident: &Ident, description: String, variants: Vec<String>) -> T
 fn generate_properties(
   ident: &Ident,
   types: &mut Vec<TokenStream>,
-  props: Vec<PropertyType>,
+  props: &[PropertyType],
   public: bool,
+  domain: &str,
+  domains: &[ProtocolDomain],
 ) -> Vec<TokenStream> {
   props
-    .into_iter()
+    .iter()
     .map(|prop| {
-      let ty = match prop.data {
+      let ty = match &prop.data {
         RefTypeOr::Ref(reference) => {
           // if reference.r#ref == ident.to_string() {
           //   quote!(Box<Self>)
           // } else {
           //   ref_to_type(reference)
           // }
-          ref_to_type(reference)
+          ref_to_type(&reference, domain, domains, false)
         }
 
         RefTypeOr::Other(other) => match other {
@@ -230,12 +254,12 @@ fn generate_properties(
           ProtocolType::Boolean => quote!(bool),
           ProtocolType::Any => quote!(serde_json::Value),
           ProtocolType::String(s) => {
-            if let Some(variants) = s.r#enum {
+            if let Some(variants) = &s.r#enum {
               let ident = format_ident!("{}{}", ident, uppercase_first(&prop.name));
               types.push(generate_enum(
                 &ident,
                 prop.description.clone().unwrap_or_default(),
-                variants,
+                &variants,
               ));
               quote!(#ident)
             } else {
@@ -244,7 +268,7 @@ fn generate_properties(
           }
 
           ProtocolType::Array(arr) => {
-            let inner = array_type_to_inner(arr.items);
+            let inner = array_type_to_inner(&arr.items, domain, domains);
             quote!(Vec<#inner>)
           }
 
@@ -264,9 +288,9 @@ fn generate_properties(
         (quote!(), ty)
       };
 
-      let name = prop.name;
+      let name = &prop.name;
       let ident = format_ident!("r#{}", inflector::cases::snakecase::to_snake_case(&name));
-      let description = prop.description.unwrap_or_default();
+      let description = prop.description.clone().unwrap_or_default();
 
       let vis = if public { quote!(pub) } else { quote!() };
 
@@ -301,14 +325,14 @@ fn main() {
   let mut domains = Vec::new();
   let mut domain_names = Vec::new();
 
-  for domain in browser.domains {
+  for domain in &browser.domains {
     domain_names.push(domain.domain.clone());
 
     let mut types = Vec::new();
     let mut commands = Vec::new();
     let mut command_results = Vec::new();
 
-    for ty in domain.types.unwrap_or_default() {
+    for ty in domain.types.clone().unwrap_or_default() {
       let ident = format_ident!("{}", ty.id);
       let description = ty.description.unwrap_or_default();
 
@@ -336,7 +360,7 @@ fn main() {
 
         DomainTypeData::String(s) => {
           if let Some(variants) = s.r#enum {
-            types.push(generate_enum(&ident, description, variants));
+            types.push(generate_enum(&ident, description, &variants));
           } else {
             types.push(quote!(
               #[doc = #description]
@@ -346,7 +370,7 @@ fn main() {
         }
 
         DomainTypeData::Array(arr) => {
-          let ty = array_type_to_inner(arr.items);
+          let ty = array_type_to_inner(&arr.items, &domain.domain, &browser.domains);
 
           types.push(quote!(
             #[doc = #description]
@@ -356,7 +380,8 @@ fn main() {
 
         DomainTypeData::Object(obj) => {
           if let Some(properties) = obj.properties {
-            let properties: Vec<_> = generate_properties(&ident, &mut types, properties, true);
+            let properties: Vec<_> =
+              generate_properties(&ident, &mut types, &properties, true, &domain.domain, &browser.domains);
 
             types.push(quote!(
               #[doc = #description]
@@ -375,14 +400,14 @@ fn main() {
       }
     }
 
-    for command in domain.commands.unwrap_or_default() {
+    for command in domain.commands.as_ref().unwrap_or(&Vec::new()) {
       let name = format!("{}.{}", domain.domain, command.event.name);
       let ident = format_ident!("{}", uppercase_first(&command.event.name));
-      let description = command.event.description.unwrap_or_default();
+      let description = command.event.description.clone().unwrap_or_default();
 
-      if let Some(parameters) = command.event.parameters {
+      if let Some(parameters) = &command.event.parameters {
         let all_optional = parameters.iter().all(|x| x.optional.unwrap_or_default());
-        let props: Vec<_> = generate_properties(&ident, &mut types, parameters, true);
+        let props: Vec<_> = generate_properties(&ident, &mut types, parameters, true, &domain.domain, &browser.domains);
 
         types.push(quote!(
           #[doc = #description]
@@ -411,8 +436,8 @@ fn main() {
         ));
       }
 
-      if let Some(ret) = command.returns {
-        let props = generate_properties(&ident, &mut types, ret, false);
+      if let Some(ret) = &command.returns {
+        let props = generate_properties(&ident, &mut types, ret, false, &domain.domain, &browser.domains);
 
         command_results.push(quote!(
           #[doc = #description]
@@ -424,8 +449,11 @@ fn main() {
     }
 
     let ident = format_ident!("{}", domain.domain.to_lowercase());
-    let description = domain.description.unwrap_or_default();
-    let dependencies = format!("Depends on: {}", domain.dependencies.unwrap_or_default().join(", "));
+    let description = domain.description.clone().unwrap_or_default();
+    let dependencies = format!(
+      "Depends on: {}",
+      domain.dependencies.clone().unwrap_or_default().join(", ")
+    );
     domains.push(quote!(
       #[doc = #description]
       #[doc = #dependencies]

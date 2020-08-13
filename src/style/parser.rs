@@ -97,9 +97,9 @@ impl<'i> cssparser::QualifiedRuleParser<'i> for QualifiedRuleParser {
     _location: cssparser::SourceLocation,
     input: &mut cssparser::Parser<'i, 't>,
   ) -> Result<Self::QualifiedRule, cssparser::ParseError<'i, Self::Error>> {
-    let mut decl_parser = cssparser::DeclarationListParser::new(input, DeclarationParser);
+    let decl_parser = cssparser::DeclarationListParser::new(input, DeclarationParser);
     let mut declarations = Vec::new();
-    while let Some(decl) = decl_parser.next() {
+    for decl in decl_parser {
       let decl = decl.map_err(|(x, _)| x)?;
       declarations.push(decl);
     }

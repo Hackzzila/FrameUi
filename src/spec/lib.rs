@@ -56,7 +56,7 @@ fn uppercase_first(s: &str) -> String {
   }
 }
 
-fn build_struct(name: &str, is_type: bool, attrs: &Vec<Attribute>, base_ident: Ident) -> TokenStream2 {
+fn build_struct(name: &str, is_type: bool, attrs: &[Attribute], base_ident: Ident) -> TokenStream2 {
   let mut fields = Vec::new();
   let mut parse_fields = Vec::new();
   let mut fns = Vec::new();
@@ -454,7 +454,7 @@ pub fn element(_: TokenStream, item: TokenStream) -> TokenStream {
   }
 
   tokens.append_all(item.to_token_stream());
-  return tokens.into();
+  tokens.into()
 }
 
 #[proc_macro]

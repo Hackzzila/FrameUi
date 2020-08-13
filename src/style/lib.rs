@@ -65,11 +65,11 @@ impl StyleSheet {
     Self { rules: Vec::new() }
   }
 
-  pub fn create_parser_input<'i>(input: &'i str) -> ParserInput<'i> {
+  pub fn create_parser_input(input: &str) -> ParserInput<'_> {
     cssparser::ParserInput::new(input)
   }
 
-  pub fn create_parser_input_with_line_offset<'i>(input: &'i str, offset: u32) -> ParserInput<'i> {
+  pub fn create_parser_input_with_line_offset(input: &str, offset: u32) -> ParserInput<'_> {
     cssparser::ParserInput::new_with_line_number_offset(input, offset)
   }
 
@@ -90,6 +90,12 @@ impl StyleSheet {
     computed: &mut ComputedStyle,
   ) {
     self.rules.iter().for_each(|x| x.apply(element, computed));
+  }
+}
+
+impl Default for StyleSheet {
+  fn default() -> StyleSheet {
+    StyleSheet::new()
   }
 }
 
