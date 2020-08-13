@@ -1,10 +1,7 @@
-use std::env;
-use std::fs::File;
-use std::path::Path;
-use std::io::prelude::*;
-use quote::{quote, format_ident};
-use serde::{Serialize, Deserialize};
-use proc_macro2::{TokenStream, Ident};
+use proc_macro2::{Ident, TokenStream};
+use quote::{format_ident, quote};
+use serde::{Deserialize, Serialize};
+use std::{env, fs::File, io::prelude::*, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Protocol {
@@ -156,7 +153,7 @@ fn array_type_to_inner(items: RefTypeOr<ArrayItemType>) -> TokenStream {
         }
 
         quote!(String)
-      },
+      }
 
       ArrayItemType::Object(obj) => {
         if obj.properties.is_some() {
@@ -164,8 +161,8 @@ fn array_type_to_inner(items: RefTypeOr<ArrayItemType>) -> TokenStream {
         }
 
         quote!(std::collections::HashMap<String, serde_json::Value>)
-      },
-    }
+      }
+    },
   }
 }
 
@@ -199,7 +196,6 @@ fn generate_enum(ident: &Ident, description: String, variants: Vec<String>) -> T
     }
   });
 
-
   quote!(
     #[doc = #description]
     #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -209,67 +205,79 @@ fn generate_enum(ident: &Ident, description: String, variants: Vec<String>) -> T
   )
 }
 
-fn generate_properties(ident: &Ident, types: &mut Vec<TokenStream>, props: Vec<PropertyType>, public: bool) -> Vec<TokenStream> {
-  props.into_iter().map(|prop| {
-    let ty = match prop.data {
-      RefTypeOr::Ref(reference) => {
-        // if reference.r#ref == ident.to_string() {
-        //   quote!(Box<Self>)
-        // } else {
-        //   ref_to_type(reference)
-        // }
-        ref_to_type(reference)
-      },
-
-      RefTypeOr::Other(other) => match other {
-        ProtocolType::Number => quote!(f64),
-        ProtocolType::Integer => quote!(i64),
-        ProtocolType::Boolean => quote!(bool),
-        ProtocolType::Any => quote!(serde_json::Value),
-        ProtocolType::String(s) => {
-          if let Some(variants) = s.r#enum {
-            let ident = format_ident!("{}{}", ident, uppercase_first(&prop.name));
-            types.push(generate_enum(&ident, prop.description.clone().unwrap_or_default(), variants));
-            quote!(#ident)
-          } else {
-            quote!(String)
-          }
-        },
-
-        ProtocolType::Array(arr) => {
-          let inner = array_type_to_inner(arr.items);
-          quote!(Vec<#inner>)
-        },
-
-        ProtocolType::Object(obj) => {
-          if obj.properties.is_some() {
-            unimplemented!();
-          }
-
-          quote!(std::collections::HashMap<String, serde_json::Value>)
+fn generate_properties(
+  ident: &Ident,
+  types: &mut Vec<TokenStream>,
+  props: Vec<PropertyType>,
+  public: bool,
+) -> Vec<TokenStream> {
+  props
+    .into_iter()
+    .map(|prop| {
+      let ty = match prop.data {
+        RefTypeOr::Ref(reference) => {
+          // if reference.r#ref == ident.to_string() {
+          //   quote!(Box<Self>)
+          // } else {
+          //   ref_to_type(reference)
+          // }
+          ref_to_type(reference)
         }
-      }
-    };
 
-    let (def, ty) = if prop.optional.unwrap_or_default() {
-      (quote!(#[serde(default)]), quote!(Option<#ty>))
-    } else {
-      (quote!(), ty)
-    };
+        RefTypeOr::Other(other) => match other {
+          ProtocolType::Number => quote!(f64),
+          ProtocolType::Integer => quote!(i64),
+          ProtocolType::Boolean => quote!(bool),
+          ProtocolType::Any => quote!(serde_json::Value),
+          ProtocolType::String(s) => {
+            if let Some(variants) = s.r#enum {
+              let ident = format_ident!("{}{}", ident, uppercase_first(&prop.name));
+              types.push(generate_enum(
+                &ident,
+                prop.description.clone().unwrap_or_default(),
+                variants,
+              ));
+              quote!(#ident)
+            } else {
+              quote!(String)
+            }
+          }
 
-    let name = prop.name;
-    let ident = format_ident!("r#{}", inflector::cases::snakecase::to_snake_case(&name));
-    let description = prop.description.unwrap_or_default();
+          ProtocolType::Array(arr) => {
+            let inner = array_type_to_inner(arr.items);
+            quote!(Vec<#inner>)
+          }
 
-    let vis = if public { quote!(pub) } else { quote!() };
+          ProtocolType::Object(obj) => {
+            if obj.properties.is_some() {
+              unimplemented!();
+            }
 
-    quote!(
-      #[doc = #description]
-      #[serde(rename = #name)]
-      #def
-      #vis #ident: #ty
-    )
-  }).collect()
+            quote!(std::collections::HashMap<String, serde_json::Value>)
+          }
+        },
+      };
+
+      let (def, ty) = if prop.optional.unwrap_or_default() {
+        (quote!(#[serde(default)]), quote!(Option<#ty>))
+      } else {
+        (quote!(), ty)
+      };
+
+      let name = prop.name;
+      let ident = format_ident!("r#{}", inflector::cases::snakecase::to_snake_case(&name));
+      let description = prop.description.unwrap_or_default();
+
+      let vis = if public { quote!(pub) } else { quote!() };
+
+      quote!(
+        #[doc = #description]
+        #[serde(rename = #name)]
+        #def
+        #vis #ident: #ty
+      )
+    })
+    .collect()
 }
 
 fn uppercase_first(s: &str) -> String {
@@ -284,7 +292,8 @@ fn main() {
   println!("cargo:rerun-if-changed=devtools-protocol/json/browser_protocol.json");
   println!("cargo:rerun-if-changed=devtools-protocol/json/js_protocol.json");
 
-  let mut browser: Protocol = serde_json::from_reader(File::open("devtools-protocol/json/browser_protocol.json").unwrap()).unwrap();
+  let mut browser: Protocol =
+    serde_json::from_reader(File::open("devtools-protocol/json/browser_protocol.json").unwrap()).unwrap();
   let js: Protocol = serde_json::from_reader(File::open("devtools-protocol/json/js_protocol.json").unwrap()).unwrap();
 
   browser.domains.extend(js.domains);
@@ -309,21 +318,21 @@ fn main() {
             #[doc = #description]
             pub type #ident = i64;
           ));
-        },
+        }
 
         DomainTypeData::Number => {
           types.push(quote!(
             #[doc = #description]
             pub type #ident = f64;
           ));
-        },
+        }
 
         DomainTypeData::Boolean => {
           types.push(quote!(
             #[doc = #description]
             pub type #ident = bool;
           ));
-        },
+        }
 
         DomainTypeData::String(s) => {
           if let Some(variants) = s.r#enum {
@@ -450,7 +459,10 @@ fn main() {
     quote!(#variant_ident(#mod_ident::CommandResult))
   });
 
-  let version = format!("DevTools Protocol Version {}.{}", browser.version.major, browser.version.minor);
+  let version = format!(
+    "DevTools Protocol Version {}.{}",
+    browser.version.major, browser.version.minor
+  );
   let bindings = quote!(
     #[doc = #version]
     #(#domains)*
@@ -485,7 +497,5 @@ fn main() {
   let mut out = File::create(&path).unwrap();
   out.write_all(bindings.to_string().as_bytes()).unwrap();
 
-  let _ = std::process::Command::new("rustfmt")
-    .arg(path)
-    .status();
+  let _ = std::process::Command::new("rustfmt").arg(path).status();
 }

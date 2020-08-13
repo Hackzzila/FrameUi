@@ -1,11 +1,15 @@
-use std::env;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 #[derive(Debug)]
 struct BindgenCallbacks;
 
 impl bindgen::callbacks::ParseCallbacks for BindgenCallbacks {
-  fn enum_variant_name(&self, enum_name: Option<&str>, name: &str, _: bindgen::callbacks::EnumVariantValue) -> Option<String> {
+  fn enum_variant_name(
+    &self,
+    enum_name: Option<&str>,
+    name: &str,
+    _: bindgen::callbacks::EnumVariantValue,
+  ) -> Option<String> {
     let enum_name = enum_name?.trim_start_matches("enum").trim();
     name.strip_prefix(enum_name).map(|x| x.to_string())
   }

@@ -6,9 +6,11 @@ pub mod sys {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-use std::str::Utf8Error;
-use std::ffi::{CStr, CString, NulError};
-use std::marker::PhantomData;
+use std::{
+  ffi::{CStr, CString, NulError},
+  marker::PhantomData,
+  str::Utf8Error,
+};
 
 #[derive(Debug)]
 pub struct FileContext {
@@ -162,9 +164,7 @@ pub struct Compiled<'ctx> {
 
 impl Compiled<'_> {
   pub fn status(&self) -> i32 {
-    unsafe {
-      sys::sass_context_get_error_status(self.ctx)
-    }
+    unsafe { sys::sass_context_get_error_status(self.ctx) }
   }
 
   pub fn output(&self) -> Result<String, Utf8Error> {
@@ -188,9 +188,7 @@ pub struct Error<'ctx> {
 
 impl Error<'_> {
   pub fn status(&self) -> i32 {
-    unsafe {
-      sys::sass_context_get_error_status(self.ctx)
-    }
+    unsafe { sys::sass_context_get_error_status(self.ctx) }
   }
 
   pub fn json(&self) -> Result<String, Utf8Error> {
@@ -229,14 +227,10 @@ impl Error<'_> {
   }
 
   pub fn line(&self) -> u64 {
-    unsafe {
-      sys::sass_context_get_error_line(self.ctx)
-    }
+    unsafe { sys::sass_context_get_error_line(self.ctx) }
   }
 
   pub fn column(&self) -> u64 {
-    unsafe {
-      sys::sass_context_get_error_column(self.ctx)
-    }
+    unsafe { sys::sass_context_get_error_column(self.ctx) }
   }
 }

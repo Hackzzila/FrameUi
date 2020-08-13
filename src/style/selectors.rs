@@ -73,12 +73,12 @@ impl cssparser::ToCss for PseudoClass {
 pub enum PseudoElement {}
 
 impl cssparser::ToCss for PseudoElement {
-    fn to_css<W>(&self, _dest: &mut W) -> fmt::Result
-    where
-        W: fmt::Write,
-    {
-        match *self {}
-    }
+  fn to_css<W>(&self, _dest: &mut W) -> fmt::Result
+  where
+    W: fmt::Write,
+  {
+    match *self {}
+  }
 }
 
 impl selectors::parser::PseudoElement for PseudoElement {

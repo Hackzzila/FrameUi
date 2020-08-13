@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#[cfg(feature="c-event")]
+#[cfg(feature = "c-event")]
 pub mod c_api;
 
-use std::sync::Arc;
 use dom::CompiledDocument;
+use std::sync::Arc;
 
 pub use render::DeviceSize;
 
@@ -32,7 +32,11 @@ pub struct EventHandler<W: Windowing> {
 impl<W: Windowing> EventHandler<W> {
   #[must_use]
   pub fn new(windowing: W, renderer: render::Renderer, doc: Arc<CompiledDocument>) -> Self {
-    Self { windowing, renderer, doc }
+    Self {
+      windowing,
+      renderer,
+      doc,
+    }
   }
 
   pub fn deinit(mut self) {
@@ -59,7 +63,7 @@ impl<W: Windowing> EventHandler<W> {
         render_inner = true;
       }
 
-      Event::Empty => {},
+      Event::Empty => {}
     }
 
     // if self.debug_flags != old_flags {

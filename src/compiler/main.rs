@@ -1,12 +1,14 @@
 use std::path::Path;
 
+use codespan_reporting::{
+  diagnostic::{Diagnostic, Label},
+  files::{Files, SimpleFiles},
+  term,
+  term::termcolor::{ColorChoice, StandardStream},
+};
 use cssparser::ToCss;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::{SimpleFiles, Files};
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use codespan_reporting::term;
 
-use compiler::{compile, Level, DiagnosticKind};
+use compiler::{compile, DiagnosticKind, Level};
 
 struct DiagnosticPrinter {
   should_exit: bool,
@@ -53,21 +55,21 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
       Level::Error => {
         self.should_exit = true;
         Diagnostic::error()
-      },
+      }
 
       Level::Warn => Diagnostic::warning(),
       Level::Info => Diagnostic::note(),
     };
 
     let diagnostic = match diagnostic.kind {
-      DiagnosticKind::ExpectedSelfClosing {..} => {
+      DiagnosticKind::ExpectedSelfClosing { .. } => {
         let (file_id, pos) = location.unwrap();
         codespan_diagnostic
           .with_message("childless elements should be self-closing")
           .with_code("E0000")
           .with_labels(vec![
-            Label::primary(file_id, pos-1..pos).with_message("expected self-closing tag"),
-            Label::secondary(file_id, pos-1..pos).with_message("help: replace with `/>`"),
+            Label::primary(file_id, pos - 1..pos).with_message("expected self-closing tag"),
+            Label::secondary(file_id, pos - 1..pos).with_message("help: replace with `/>`"),
           ])
       }
 
@@ -78,7 +80,7 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
           .with_code("E0000")
           .with_labels(vec![
             Label::primary(file_id, pos..pos).with_message("expected explicit closing tag"),
-            Label::secondary(file_id, pos-2..pos-1).with_message("help: remove`/`"),
+            Label::secondary(file_id, pos - 2..pos - 1).with_message("help: remove`/`"),
             Label::secondary(file_id, pos..pos).with_message(format!("help: add `</{}>`", el)),
           ])
       }
@@ -89,7 +91,7 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
           .with_message("invalid attribute")
           .with_code("E0000")
           .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(format!("invalid attribute `{}` for `{}`", attr, el)),
+            Label::primary(file_id, pos..pos).with_message(format!("invalid attribute `{}` for `{}`", attr, el))
           ])
       }
 
@@ -99,7 +101,7 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
           .with_message("invalid element")
           .with_code("E0000")
           .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(format!("invalid element `{}`", el)),
+            Label::primary(file_id, pos..pos).with_message(format!("invalid element `{}`", el))
           ])
       }
 
@@ -108,9 +110,8 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
         codespan_diagnostic
           .with_message("element found in invalid context")
           .with_code("E0000")
-          .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(format!("element `{}` is not allowed inside `{}`", el, parent)),
-          ])
+          .with_labels(vec![Label::primary(file_id, pos..pos)
+            .with_message(format!("element `{}` is not allowed inside `{}`", el, parent))])
       }
 
       DiagnosticKind::CssParseError(err) => {
@@ -118,36 +119,34 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
         codespan_diagnostic
           .with_message("CSS parsing error")
           .with_code("E0000")
-          .with_labels(vec![
-            match err.0.kind {
-              cssparser::ParseErrorKind::Basic(err) => match err {
-                cssparser::BasicParseErrorKind::UnexpectedToken(token) => {
-                  let css = token.to_css_string();
-                  let end = pos + 1 + css.len();
-                  Label::primary(file_id, pos + 1..end).with_message(format!("unexpected token `{}`", css))
-                }
-
-                cssparser::BasicParseErrorKind::EndOfInput => {
-                  Label::primary(file_id, pos..pos).with_message(format!("end of input"))
-                }
-
-                cssparser::BasicParseErrorKind::AtRuleInvalid(rule) => {
-                  let beg = pos - rule.len() - 1;
-                  Label::primary(file_id, beg..pos).with_message(format!("at-rule `{}` invalid", rule))
-                }
-
-                cssparser::BasicParseErrorKind::AtRuleBodyInvalid => {
-                  Label::primary(file_id, pos..pos).with_message(format!("at-rule body invalid"))
-                }
-
-                cssparser::BasicParseErrorKind::QualifiedRuleInvalid => {
-                  Label::primary(file_id, pos..pos).with_message(format!("qualified rule invalid"))
-                }
+          .with_labels(vec![match err.0.kind {
+            cssparser::ParseErrorKind::Basic(err) => match err {
+              cssparser::BasicParseErrorKind::UnexpectedToken(token) => {
+                let css = token.to_css_string();
+                let end = pos + 1 + css.len();
+                Label::primary(file_id, pos + 1..end).with_message(format!("unexpected token `{}`", css))
               }
 
-              cssparser::ParseErrorKind::Custom(..) => unimplemented!(),
-            }
-          ])
+              cssparser::BasicParseErrorKind::EndOfInput => {
+                Label::primary(file_id, pos..pos).with_message(format!("end of input"))
+              }
+
+              cssparser::BasicParseErrorKind::AtRuleInvalid(rule) => {
+                let beg = pos - rule.len() - 1;
+                Label::primary(file_id, beg..pos).with_message(format!("at-rule `{}` invalid", rule))
+              }
+
+              cssparser::BasicParseErrorKind::AtRuleBodyInvalid => {
+                Label::primary(file_id, pos..pos).with_message(format!("at-rule body invalid"))
+              }
+
+              cssparser::BasicParseErrorKind::QualifiedRuleInvalid => {
+                Label::primary(file_id, pos..pos).with_message(format!("qualified rule invalid"))
+              }
+            },
+
+            cssparser::ParseErrorKind::Custom(..) => unimplemented!(),
+          }])
       }
 
       DiagnosticKind::SassParseError(err) => {
@@ -155,20 +154,14 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
         codespan_diagnostic
           .with_message("libsass error")
           .with_code("E0000")
-          .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(err),
-          ])
+          .with_labels(vec![Label::primary(file_id, pos..pos).with_message(err)])
       }
 
       kind => {
         if let Some((file_id, pos)) = location {
-          codespan_diagnostic
-            .with_labels(vec![
-              Label::primary(file_id, pos..pos).with_message(kind.to_string()),
-            ])
+          codespan_diagnostic.with_labels(vec![Label::primary(file_id, pos..pos).with_message(kind.to_string())])
         } else {
-          codespan_diagnostic
-            .with_message(kind.to_string())
+          codespan_diagnostic.with_message(kind.to_string())
         }
       }
     };
@@ -185,24 +178,28 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
   }
 }
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 
 fn main() {
   let matches = App::new(env!("CARGO_PKG_NAME"))
     .version(env!("CARGO_PKG_VERSION"))
     .author(env!("CARGO_PKG_AUTHORS"))
     .about(env!("CARGO_PKG_DESCRIPTION"))
-    .arg(Arg::with_name("INPUT")
-      .help("Sets the input file to use")
-      .required(true)
-      .index(1))
-    .arg(Arg::with_name("output")
-      .short("o")
-      .long("output")
-      .value_name("FILE")
-      .help("Sets the output file")
-      .required(true)
-      .takes_value(true))
+    .arg(
+      Arg::with_name("INPUT")
+        .help("Sets the input file to use")
+        .required(true)
+        .index(1),
+    )
+    .arg(
+      Arg::with_name("output")
+        .short("o")
+        .long("output")
+        .value_name("FILE")
+        .help("Sets the output file")
+        .required(true)
+        .takes_value(true),
+    )
     .get_matches();
 
   let mut printer = DiagnosticPrinter::new();
@@ -211,7 +208,7 @@ fn main() {
     Ok(doc) => {
       let f = std::fs::File::create(matches.value_of("output").unwrap()).unwrap();
       doc.save_into(f);
-    },
+    }
 
     Err(..) => {}
   }

@@ -2,18 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use webrender::{DebugFlags, ShaderPrecacheFlags};
-use webrender::api::*;
-use webrender::api::units::*;
-use euclid::vec2;
-use std::rc::Rc;
+use euclid::{vec2, Size2D};
 use gleam::gl::Gl;
-use euclid::Size2D;
+use std::rc::Rc;
+use webrender::{
+  api::{units::*, *},
+  DebugFlags, ShaderPrecacheFlags,
+};
 
-use std::sync::Arc;
 use dom::CompiledDocument;
+use std::sync::Arc;
 
-#[cfg(feature="c-render")]
+#[cfg(feature = "c-render")]
 pub mod c_api;
 
 // pub trait HandyDandyRectBuilder {
@@ -72,7 +72,6 @@ pub mod c_api;
 //   }
 // }
 
-
 const PRECACHE_SHADER_FLAGS: ShaderPrecacheFlags = ShaderPrecacheFlags::EMPTY;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -81,7 +80,7 @@ pub struct DevicePixel;
 
 pub type DeviceSize = Size2D<i32, DevicePixel>;
 
-#[doc="module=render"]
+#[doc = "module=render"]
 pub struct Renderer {
   renderer: webrender::Renderer,
   device_size: DeviceIntSize,
@@ -94,7 +93,12 @@ pub struct Renderer {
 }
 
 impl Renderer {
-  pub fn new(gl: Rc<dyn Gl>, device_pixel_ratio: f32, device_size: DeviceSize, notifier: Box<dyn RenderNotifier>) -> Self {
+  pub fn new(
+    gl: Rc<dyn Gl>,
+    device_pixel_ratio: f32,
+    device_size: DeviceSize,
+    notifier: Box<dyn RenderNotifier>,
+  ) -> Self {
     let device_size = DeviceIntSize::new(device_size.width, device_size.height);
     // let gl = windowing.get_gl();
 
@@ -112,13 +116,7 @@ impl Renderer {
       ..webrender::RendererOptions::default()
     };
 
-    let (renderer, sender) = webrender::Renderer::new(
-      gl,
-      notifier,
-      opts,
-      None,
-      device_size,
-    ).unwrap();
+    let (renderer, sender) = webrender::Renderer::new(gl, notifier, opts, None, device_size).unwrap();
     let mut api = sender.create_api();
     let document_id = api.add_document(device_size, 0);
 
@@ -197,12 +195,7 @@ impl Renderer {
     let _ = self.renderer.flush_pipeline_info();
   }
 
-  fn render_inner(
-    &mut self,
-    builder: &mut DisplayListBuilder,
-    txn: &mut Transaction,
-    doc: &Arc<CompiledDocument>,
-  ) {
+  fn render_inner(&mut self, builder: &mut DisplayListBuilder, txn: &mut Transaction, doc: &Arc<CompiledDocument>) {
     let content_bounds = LayoutRect::new(LayoutPoint::zero(), builder.content_size());
     let root_space_and_clip = SpaceAndClipInfo::root_scroll(self.pipeline_id);
     let spatial_id = root_space_and_clip.spatial_id;
@@ -218,10 +211,7 @@ impl Renderer {
       );
 
       builder.push_rect(
-        &CommonItemProperties::new(
-          rect,
-          root_space_and_clip,
-        ),
+        &CommonItemProperties::new(rect, root_space_and_clip),
         rect,
         ColorF::new(
           node.render.background_color.0 as f32 / 255.0,

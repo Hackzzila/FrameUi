@@ -1,27 +1,22 @@
-use std::{
-  thread,
-  sync::{
-    Arc,
-  },
-};
+use std::{sync::Arc, thread};
 
 use devtools_protocol as dt;
 
 use dashmap::DashMap;
-use log::{trace, error};
-use indextree::{Arena, NodeId};
 use futures_util::sink::SinkExt;
-use tungstenite::{
-  protocol::Message,
-  handshake::server::{Request, Response},
-};
+use indextree::{Arena, NodeId};
+use log::{error, trace};
 use tokio::{
+  net::{TcpListener, TcpStream, ToSocketAddrs},
   runtime::Runtime,
   stream::StreamExt,
-  net::{TcpListener, TcpStream, ToSocketAddrs},
+};
+use tungstenite::{
+  handshake::server::{Request, Response},
+  protocol::Message,
 };
 
-use ::dom::{Element, ElementData, CompiledDocument};
+use ::dom::{CompiledDocument, Element, ElementData};
 
 #[derive(PartialEq, Debug)]
 #[repr(u16)]
@@ -32,7 +27,7 @@ enum NodeType {
   Text = 3,
   CDataSection = 4,
   EntityReference = 5, // historical
-  Entity = 6, // historical
+  Entity = 6,          // historical
   ProcessingInstruction = 7,
   Comment = 8,
   Document = 9,
@@ -42,7 +37,10 @@ enum NodeType {
 }
 
 fn node_from_element(node_id: NodeId, parent: Option<NodeId>, elements: &Arena<Element>) -> dt::dom::Node {
-  let children: Vec<dt::dom::Node> = node_id.children(elements).map(|x| node_from_element(x, Some(node_id), elements)).collect();
+  let children: Vec<dt::dom::Node> = node_id
+    .children(elements)
+    .map(|x| node_from_element(x, Some(node_id), elements))
+    .collect();
 
   let node = elements.get(node_id).unwrap().get();
 
@@ -111,10 +109,7 @@ impl DevTools {
       });
     });
 
-    DevTools {
-      counter: 0,
-      documents
-    }
+    DevTools { counter: 0, documents }
   }
 
   async fn handle_connection(stream: TcpStream, views: Arc<DashMap<usize, Arc<CompiledDocument>>>) {
@@ -145,45 +140,44 @@ impl DevTools {
               Ok(cmd) => {
                 let id = cmd.id;
                 match cmd.data {
-                  dt::CommandData::DOM(cmd) => {
-                    match cmd {
-                      dt::dom::Command::GetDocument { .. } => {
-                        let out = {
-                          let view = {
-                            Arc::clone(views.get(&idx).unwrap().value())
-                          };
+                  dt::CommandData::DOM(cmd) => match cmd {
+                    dt::dom::Command::GetDocument { .. } => {
+                      let out = {
+                        let view = { Arc::clone(views.get(&idx).unwrap().value()) };
 
-                          let elements = view.elements.read().unwrap();
-                          let root = node_from_element(view.root, None, &elements);
+                        let elements = view.elements.read().unwrap();
+                        let root = node_from_element(view.root, None, &elements);
 
-                          dt::CommandResult {
-                            id,
-                            result: dt::CommandResultData::DOM(
-                              dt::dom::CommandResult::GetDocument { root: Box::new(root) },
-                            )
-                          }
-                        };
+                        dt::CommandResult {
+                          id,
+                          result: dt::CommandResultData::DOM(dt::dom::CommandResult::GetDocument {
+                            root: Box::new(root),
+                          }),
+                        }
+                      };
 
-                        ws_stream.send(Message::Text(serde_json::to_string(&out).unwrap())).await.unwrap();
-                      }
-
-                      _ => {},
+                      ws_stream
+                        .send(Message::Text(serde_json::to_string(&out).unwrap()))
+                        .await
+                        .unwrap();
                     }
-                  }
 
-                  _ => {},
+                    _ => {}
+                  },
+
+                  _ => {}
                 }
               }
 
               Err(e) => {
                 println!("{} {:?}", text, e);
-              },
+              }
             };
           }
         }
       }
 
-      Err(e) => error!("websocket error: {}", e)
+      Err(e) => error!("websocket error: {}", e),
     }
   }
 

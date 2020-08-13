@@ -1,17 +1,13 @@
-use std::env;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 #[cfg(target_env = "msvc")]
 fn compile() {
   let target = std::env::var("TARGET").unwrap();
-  let msvc_platform = if target.contains("x86_64") {
-      "Win64"
-  } else {
-      "Win32"
-  };
+  let msvc_platform = if target.contains("x86_64") { "Win64" } else { "Win32" };
 
   let msbuild = cc::windows_registry::find_tool(&target, "msbuild.exe").expect("Failed to find MSBuild");
-  let status = msbuild.to_command()
+  let status = msbuild
+    .to_command()
     .args(&[
       "win\\libsass.sln",
       "/p:LIBSASS_STATIC_LIB=1",
@@ -27,15 +23,16 @@ fn compile() {
     panic!("Failed to build libsass");
   }
 
-  println!("cargo:rustc-link-search={}/libsass/win/bin", std::env::current_dir().unwrap().display());
+  println!(
+    "cargo:rustc-link-search={}/libsass/win/bin",
+    std::env::current_dir().unwrap().display()
+  );
   println!("cargo:rustc-link-lib=static=libsass");
 }
 
-
 #[cfg(not(target_env = "msvc"))]
 fn compile() {
-  use std::process::Command;
-  use std::collections::HashMap;
+  use std::{collections::HashMap, process::Command};
 
   let mut envs = HashMap::new();
   let make_executable = if cfg!(windows) {
@@ -58,7 +55,10 @@ fn compile() {
     panic!("Failed to build libsass");
   }
 
-  println!("cargo:rustc-link-search={}/libsass/lib", std::env::current_dir().unwrap().display());
+  println!(
+    "cargo:rustc-link-search={}/libsass/lib",
+    std::env::current_dir().unwrap().display()
+  );
   println!("cargo:rustc-link-lib=static=sass");
   println!("cargo:rustc-link-lib=c++");
 }

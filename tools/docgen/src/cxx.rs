@@ -2,7 +2,7 @@ use clang::*;
 
 use std::collections::HashMap;
 
-use super::{parse_comment, doc, c::*};
+use super::{c::*, doc, parse_comment};
 
 fn uppercase_first(s: &str) -> String {
   let mut c = s.chars();
@@ -13,20 +13,26 @@ fn uppercase_first(s: &str) -> String {
 }
 
 pub fn to_pascal_case(s: &str) -> String {
-  s.split("_").map(|x| {
-    uppercase_first(x)
-  }).collect::<String>()
+  s.split("_").map(|x| uppercase_first(x)).collect::<String>()
 }
 
 impl Module<'_> {
   pub fn to_cxx(&self) -> String {
-    let children = self.children.iter().map(|(_, x)| x.to_cxx()).collect::<Vec<_>>().join("\n");
+    let children = self
+      .children
+      .iter()
+      .map(|(_, x)| x.to_cxx())
+      .collect::<Vec<_>>()
+      .join("\n");
 
-    format!("
+    format!(
+      "
       namespace {} {{
         {}
       }}
-    ", self.name, children)
+    ",
+      self.name, children
+    )
   }
 }
 
@@ -51,7 +57,8 @@ impl Struct<'_> {
     methods.sort_by_key(|(_, x)| x.get_index());
     let methods = methods.iter().map(|(_, x)| x.to_cxx()).collect::<Vec<_>>().join("\n");
 
-    format!("
+    format!(
+      "
       class {} {{
         public:
           {}
@@ -69,7 +76,9 @@ impl Struct<'_> {
         private:
           c_api::{0} *self = nullptr;
       }};
-    ", self.name, methods)
+    ",
+      self.name, methods
+    )
   }
 }
 
@@ -104,7 +113,7 @@ impl Method<'_> {
       if name == "self" && kind == MethodKind::StaticMethod {
         c_args.push(name);
         kind = MethodKind::Method;
-        continue
+        continue;
       }
 
       args.push(format!("{} {}", ty, name));
@@ -115,44 +124,41 @@ impl Method<'_> {
     let c_args = c_args.join(", ");
 
     match kind {
-      MethodKind::Constructor => {
-        format!("
+      MethodKind::Constructor => format!(
+        "
           {struct_name}({args}) {{
             self = c_api::{c_name}({c_args});
           }}",
-          struct_name=struct_name,
-          args=args,
-          c_name=c_name,
-          c_args=c_args,
-        )
-      }
+        struct_name = struct_name,
+        args = args,
+        c_name = c_name,
+        c_args = c_args,
+      ),
 
-      MethodKind::Destructor => {
-        format!("
+      MethodKind::Destructor => format!(
+        "
           ~{struct_name}() {{
             if (self) {{
               c_api::{c_name}(self);
             }}
           }}",
-          struct_name=struct_name,
-          c_name=c_name,
-        )
-      }
+        struct_name = struct_name,
+        c_name = c_name,
+      ),
 
-      _ => {
-        format!("
+      _ => format!(
+        "
           {static_keyword} {ret} {name}({args}) {{
             assert(self != nullptr);
             return c_api::{c_name}({c_args});
           }}",
-          static_keyword=if kind == MethodKind::StaticMethod { "static" } else { "" },
-          ret=return_type,
-          name=name,
-          args=args,
-          c_name=c_name,
-          c_args=c_args,
-        )
-      }
+        static_keyword = if kind == MethodKind::StaticMethod { "static" } else { "" },
+        ret = return_type,
+        name = name,
+        args = args,
+        c_name = c_name,
+        c_args = c_args,
+      ),
     }
   }
 }

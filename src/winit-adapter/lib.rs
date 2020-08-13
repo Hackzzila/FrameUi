@@ -1,14 +1,10 @@
-use std::sync::Arc;
 use dom::CompiledDocument;
+use std::sync::Arc;
 
 use glutin::{
-  ContextWrapper,
-  NotCurrent,
-  PossiblyCurrent,
-  ContextBuilder,
-  GlRequest,
-  window::{WindowId, WindowBuilder},
   event_loop::{EventLoopProxy, EventLoopWindowTarget},
+  window::{WindowBuilder, WindowId},
+  ContextBuilder, ContextWrapper, GlRequest, NotCurrent, PossiblyCurrent,
 };
 
 use gleam::gl;
@@ -39,13 +35,7 @@ impl RenderNotifier for Notifier {
     let _ = self.events_proxy.send_event(());
   }
 
-  fn new_frame_ready(
-    &self,
-    _: DocumentId,
-    _scrolled: bool,
-    _composite_needed: bool,
-    _render_time: Option<u64>
-  ) {
+  fn new_frame_ready(&self, _: DocumentId, _scrolled: bool, _composite_needed: bool, _render_time: Option<u64>) {
     self.wake_up();
   }
 }
@@ -56,7 +46,12 @@ pub struct Window {
 }
 
 impl Window {
-  pub fn new<TE>(wb: WindowBuilder, el: &EventLoopWindowTarget<TE>, notifier: Box<dyn RenderNotifier>, doc: Arc<CompiledDocument>) -> Self {
+  pub fn new<TE>(
+    wb: WindowBuilder,
+    el: &EventLoopWindowTarget<TE>,
+    notifier: Box<dyn RenderNotifier>,
+    doc: Arc<CompiledDocument>,
+  ) -> Self {
     let windowed_context = ContextBuilder::new()
       .with_gl(GlRequest::GlThenGles {
         opengl_version: (3, 2),
@@ -72,9 +67,7 @@ impl Window {
     let device_pixel_ratio = windowed_context.window().scale_factor() as f32;
 
     let device_size = {
-      let size = windowed_context
-        .window()
-        .inner_size();
+      let size = windowed_context.window().inner_size();
       render::DeviceSize::new(size.width as i32, size.height as i32)
     };
 
@@ -82,20 +75,18 @@ impl Window {
 
     let gl = match windowed_context.get_api() {
       glutin::Api::OpenGl => unsafe {
-        gl::GlFns::load_with(
-          |symbol| windowed_context.get_proc_address(symbol) as *const _
-        )
+        gl::GlFns::load_with(|symbol| windowed_context.get_proc_address(symbol) as *const _)
       },
       glutin::Api::OpenGlEs => unsafe {
-        gl::GlesFns::load_with(
-          |symbol| windowed_context.get_proc_address(symbol) as *const _
-        )
+        gl::GlesFns::load_with(|symbol| windowed_context.get_proc_address(symbol) as *const _)
       },
       glutin::Api::WebGl => unimplemented!(),
     };
 
     use event::Windowing;
-    let mut windowing_impl = InternalWindow { windowed_context: GlContext::PossiblyCurrent(windowed_context) };
+    let mut windowing_impl = InternalWindow {
+      windowed_context: GlContext::PossiblyCurrent(windowed_context),
+    };
     windowing_impl.make_current();
 
     let renderer = render::Renderer::new(gl, device_pixel_ratio, device_size, notifier);
@@ -125,8 +116,7 @@ impl Window {
             event::Event::ScaleFactorChanged(*scale_factor as f32)
           }
 
-          glutin::event::WindowEvent::AxisMotion { .. } |
-          glutin::event::WindowEvent::CursorMoved { .. } => {
+          glutin::event::WindowEvent::AxisMotion { .. } | glutin::event::WindowEvent::CursorMoved { .. } => {
             return;
           }
 
@@ -144,7 +134,7 @@ impl Window {
         self.event_handler.handle_event(event::Event::Redraw);
       }
 
-      _ => {},
+      _ => {}
     };
   }
 

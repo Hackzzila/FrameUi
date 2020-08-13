@@ -1,7 +1,7 @@
 use std::sync::RwLock;
 
-use serde::{Serialize, Deserialize};
-use indextree::{Arena, NodeId, Node};
+use indextree::{Arena, Node, NodeId};
+use serde::{Deserialize, Serialize};
 
 pub const STRUCTURE_VERSION: u8 = 0;
 
@@ -156,7 +156,11 @@ impl CompiledDocument {
 
   pub fn query_selector(&self, selector: &str) -> Option<NodeId> {
     let mut input = cssparser::ParserInput::new(selector);
-    let list = selectors::SelectorList::parse(&style::selectors::SelectorParser, &mut cssparser::Parser::new(&mut input)).ok()?;
+    let list = selectors::SelectorList::parse(
+      &style::selectors::SelectorParser,
+      &mut cssparser::Parser::new(&mut input),
+    )
+    .ok()?;
 
     let mut context = selectors::matching::MatchingContext::new(
       selectors::matching::MatchingMode::Normal,
@@ -168,7 +172,7 @@ impl CompiledDocument {
     let arena = self.elements.read().ok()?;
     for node in arena.iter() {
       if node.is_removed() {
-        continue
+        continue;
       }
 
       let element = MatchingElement {
@@ -188,7 +192,10 @@ impl CompiledDocument {
 impl Drop for CompiledDocument {
   fn drop(&mut self) {
     unsafe {
-      self.elements.get_mut().unwrap()[self.root].get_mut().yg.free_recursive();
+      self.elements.get_mut().unwrap()[self.root]
+        .get_mut()
+        .yg
+        .free_recursive();
     }
   }
 }
@@ -295,22 +302,22 @@ impl<'a> selectors::Element for MatchingElement<'a> {
     false
   }
 
-  fn has_id(
-    &self,
-    id: &String,
-    case_sensitivity: selectors::attr::CaseSensitivity,
-  ) -> bool {
-    self.node.get().id.as_ref().map_or(false, |id_attr| {
-      case_sensitivity.eq(id.as_bytes(), id_attr.as_bytes())
-    })
+  fn has_id(&self, id: &String, case_sensitivity: selectors::attr::CaseSensitivity) -> bool {
+    self
+      .node
+      .get()
+      .id
+      .as_ref()
+      .map_or(false, |id_attr| case_sensitivity.eq(id.as_bytes(), id_attr.as_bytes()))
   }
 
-  fn has_class(
-    &self,
-    name: &String,
-    case_sensitivity: selectors::attr::CaseSensitivity,
-  ) -> bool {
-    self.node.get().classes.iter().any(|class| case_sensitivity.eq(class.as_bytes(), name.as_bytes()))
+  fn has_class(&self, name: &String, case_sensitivity: selectors::attr::CaseSensitivity) -> bool {
+    self
+      .node
+      .get()
+      .classes
+      .iter()
+      .any(|class| case_sensitivity.eq(class.as_bytes(), name.as_bytes()))
   }
 
   fn attr_matches(
@@ -337,7 +344,8 @@ impl<'a> selectors::Element for MatchingElement<'a> {
     _flags_setter: &mut F,
   ) -> bool
   where
-    F: FnMut(&Self, selectors::matching::ElementSelectorFlags) {
+    F: FnMut(&Self, selectors::matching::ElementSelectorFlags),
+  {
     false
   }
 }
@@ -346,5 +354,5 @@ impl<'a> selectors::Element for MatchingElement<'a> {
 macro_rules! include_document {
   ($file:expr) => {
     ::std::sync::Arc::new(::project_a::dom::CompiledDocument::load(include_bytes!($file)))
-  }
+  };
 }

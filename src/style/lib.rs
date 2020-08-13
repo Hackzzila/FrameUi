@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub mod parser;
 pub mod selectors;
@@ -50,7 +50,10 @@ impl Default for ComputedStyle {
 }
 
 pub type ParserInput<'i> = cssparser::ParserInput<'i>;
-pub type Error<'i> = (cssparser::ParseError<'i, ::selectors::parser::SelectorParseErrorKind<'i>>, &'i str);
+pub type Error<'i> = (
+  cssparser::ParseError<'i, ::selectors::parser::SelectorParseErrorKind<'i>>,
+  &'i str,
+);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StyleSheet {
@@ -81,7 +84,11 @@ impl StyleSheet {
     Ok(())
   }
 
-  pub fn apply<E: ::selectors::Element<Impl = selectors::SelectorImpl>>(&self, element: &E, computed: &mut ComputedStyle) {
+  pub fn apply<E: ::selectors::Element<Impl = selectors::SelectorImpl>>(
+    &self,
+    element: &E,
+    computed: &mut ComputedStyle,
+  ) {
     self.rules.iter().for_each(|x| x.apply(element, computed));
   }
 }
@@ -94,7 +101,11 @@ pub struct StyleRule {
 }
 
 impl StyleRule {
-  pub fn apply<E: ::selectors::Element<Impl = selectors::SelectorImpl>>(&self, element: &E, computed: &mut ComputedStyle) {
+  pub fn apply<E: ::selectors::Element<Impl = selectors::SelectorImpl>>(
+    &self,
+    element: &E,
+    computed: &mut ComputedStyle,
+  ) {
     let mut context = ::selectors::matching::MatchingContext::new(
       ::selectors::matching::MatchingMode::Normal,
       None,
@@ -113,14 +124,14 @@ use cssparser::ToCss;
 #[derive(Serialize, Deserialize)]
 struct SerdeStyleRule {
   selectors: String,
-  properties: Vec<Declaration>
+  properties: Vec<Declaration>,
 }
 
 impl From<StyleRule> for SerdeStyleRule {
   fn from(rule: StyleRule) -> Self {
     Self {
       selectors: rule.selectors.to_css_string(),
-      properties: rule.properties
+      properties: rule.properties,
     }
   }
 }
@@ -128,7 +139,8 @@ impl From<StyleRule> for SerdeStyleRule {
 impl From<SerdeStyleRule> for StyleRule {
   fn from(rule: SerdeStyleRule) -> Self {
     let mut input = cssparser::ParserInput::new(&rule.selectors);
-    let selectors = ::selectors::SelectorList::parse(&selectors::SelectorParser, &mut cssparser::Parser::new(&mut input)).unwrap();
+    let selectors =
+      ::selectors::SelectorList::parse(&selectors::SelectorParser, &mut cssparser::Parser::new(&mut input)).unwrap();
     StyleRule {
       selectors,
       properties: rule.properties,

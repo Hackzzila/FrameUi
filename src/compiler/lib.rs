@@ -1,21 +1,18 @@
 use std::{
-  io,
-  io::BufReader,
-  fs::File,
   fmt,
+  fs::File,
+  io,
+  io::{prelude::*, BufReader},
   path::Path,
-  sync::{
-    RwLock,
-  },
-  io::prelude::*,
+  sync::RwLock,
 };
 
-use url::{Url};
 use indextree::{Arena, NodeId};
-use quick_xml::events::{Event, BytesStart};
+use quick_xml::events::{BytesStart, Event};
 use reqwest::blocking::{get, Response};
+use url::Url;
 
-use dom::{STRUCTURE_VERSION, Element, ElementData, RootElement, UnstyledElement, CompiledDocument};
+use dom::{CompiledDocument, Element, ElementData, RootElement, UnstyledElement, STRUCTURE_VERSION};
 use style::StyleSheet;
 
 #[path = "style.rs"]
@@ -190,7 +187,7 @@ pub trait DiagnosticReporter {
 struct Context<'r, FileId: fmt::Debug + Clone> {
   body: Arena<dom::Element>,
   root: NodeId,
-  reporter: &'r mut dyn DiagnosticReporter<FileId=FileId>,
+  reporter: &'r mut dyn DiagnosticReporter<FileId = FileId>,
   stylesheet: StyleSheet,
 }
 
@@ -204,7 +201,7 @@ macro_rules! handle_error_with_location {
         kind: e.into(),
       })
     }
-  }
+  };
 }
 
 #[macro_export]
@@ -218,15 +215,24 @@ macro_rules! handle_error {
         kind: e.into(),
       })
     }
-  }
+  };
 }
 
 impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
-  fn handle_event<R: BufRead>(&mut self, event: Event, file_id: &FileId, reader: &mut quick_xml::Reader<R>) -> Result<(), ()>{
+  fn handle_event<R: BufRead>(
+    &mut self,
+    event: Event,
+    file_id: &FileId,
+    reader: &mut quick_xml::Reader<R>,
+  ) -> Result<(), ()> {
     match event {
       Event::Text(text) => {
-        let text = text.unescaped().map_err(handle_error_with_location!(self, file_id, reader))?;
-        let text = reader.decode(&text).map_err(handle_error_with_location!(self, file_id, reader))?;
+        let text = text
+          .unescaped()
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
+        let text = reader
+          .decode(&text)
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
 
         if text.trim().is_empty() {
           Ok(())
@@ -285,25 +291,32 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
         Err(())
       }
 
-      Event::Comment(..) => {
-        Ok(())
-      }
+      Event::Comment(..) => Ok(()),
 
-      _ => {
-        unimplemented!()
-      }
+      _ => unimplemented!(),
     }
   }
 
-  fn compile_root<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  fn compile_root<R: BufRead>(
+    &mut self,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     let mut found_frame = false;
     loop {
-      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
+      match reader
+        .read_event(buf)
+        .map_err(handle_error_with_location!(self, file_id, reader))?
+      {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
+          let name = reader
+            .decode(&name)
+            .map_err(handle_error_with_location!(self, file_id, reader))?;
 
           if name == "Frame" {
             if found_frame == true {
@@ -329,16 +342,27 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_frame<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  fn compile_frame<R: BufRead>(
+    &mut self,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     let mut found_head = false;
     let mut found_body = false;
     loop {
-      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
+      match reader
+        .read_event(buf)
+        .map_err(handle_error_with_location!(self, file_id, reader))?
+      {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
+          let name = reader
+            .decode(&name)
+            .map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Head" => {
@@ -347,7 +371,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
               }
               found_head = true;
               self.compile_head(reader, buf, url, file_id)?;
-            },
+            }
 
             "Body" => {
               if found_body == true {
@@ -355,9 +379,9 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
               }
               found_body = true;
               self.compile_body(reader, buf, url, file_id)?;
-            },
+            }
 
-            _ => panic!("unknown {}", name)
+            _ => panic!("unknown {}", name),
           }
         }
 
@@ -376,41 +400,53 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_head<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  fn compile_head<R: BufRead>(
+    &mut self,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     loop {
-      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
+      match reader
+        .read_event(buf)
+        .map_err(handle_error_with_location!(self, file_id, reader))?
+      {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
+          let name = reader
+            .decode(&name)
+            .map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Style" => {
               self.compile_style(e.to_owned(), false, reader, buf, url, file_id)?;
-            },
+            }
 
-            _ => panic!("unknown {}", name)
+            _ => panic!("unknown {}", name),
           }
         }
 
         Event::Empty(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
+          let name = reader
+            .decode(&name)
+            .map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Style" => {
               self.compile_style(e.to_owned(), true, reader, buf, url, file_id)?;
-            },
+            }
 
-            _ => panic!("unknown {}", name)
+            _ => panic!("unknown {}", name),
           }
         }
 
         Event::End(..) => break,
 
         event => self.handle_event(event, file_id, reader)?,
-
       }
       buf.clear();
     }
@@ -418,20 +454,38 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_body<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  fn compile_body<R: BufRead>(
+    &mut self,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     self.compile_ui_element(self.root, reader, buf, url, file_id)
   }
 
-  fn compile_ui_element<R: BufRead>(&mut self, parent: NodeId, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  fn compile_ui_element<R: BufRead>(
+    &mut self,
+    parent: NodeId,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     loop {
-      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
+      match reader
+        .read_event(buf)
+        .map_err(handle_error_with_location!(self, file_id, reader))?
+      {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
+          let name = reader
+            .decode(&name)
+            .map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Unstyled" => {
@@ -439,7 +493,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
               self.compile_unstyled(e, parent, reader, buf, url, file_id)?;
             }
 
-            _ => panic!("unknown {}", name)
+            _ => panic!("unknown {}", name),
           }
         }
 
@@ -454,18 +508,34 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_unstyled<'a, R: BufRead>(&mut self, e: BytesStart<'a>, parent: NodeId, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  fn compile_unstyled<'a, R: BufRead>(
+    &mut self,
+    e: BytesStart<'a>,
+    parent: NodeId,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     let name = e.name();
-    let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
+    let name = reader
+      .decode(&name)
+      .map_err(handle_error_with_location!(self, file_id, reader))?;
 
     let mut el = Element::new(ElementData::Unstyled(UnstyledElement));
     for attr in e.attributes() {
       let attr = attr.map_err(handle_error_with_location!(self, file_id, reader))?;
-      let key = reader.decode(attr.key).map_err(handle_error_with_location!(self, file_id, reader))?;
-      let value = attr.unescaped_value().map_err(handle_error_with_location!(self, file_id, reader))?;
-      let value = reader.decode(&value).map_err(handle_error_with_location!(self, file_id, reader))?;
+      let key = reader
+        .decode(attr.key)
+        .map_err(handle_error_with_location!(self, file_id, reader))?;
+      let value = attr
+        .unescaped_value()
+        .map_err(handle_error_with_location!(self, file_id, reader))?;
+      let value = reader
+        .decode(&value)
+        .map_err(handle_error_with_location!(self, file_id, reader))?;
 
       match key {
         "class" => {
@@ -500,7 +570,10 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
   }
 }
 
-pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(url: URL, reporter: &mut dyn DiagnosticReporter<FileId=FileId>) -> Result<CompiledDocument, ()> {
+pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(
+  url: URL,
+  reporter: &mut dyn DiagnosticReporter<FileId = FileId>,
+) -> Result<CompiledDocument, ()> {
   let url = url.into_url().map_err(handle_error!(reporter))?;
 
   let mut out = String::new();

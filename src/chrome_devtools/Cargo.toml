@@ -9,10 +9,6 @@ edition = "2018"
 [lib]
 path = "lib.rs"
 
-[[bin]]
-name = "chrome_devtools"
-path = "main.rs"
-
 [dependencies]
 dom = { path = "../dom" }
 dashmap = "3.11"

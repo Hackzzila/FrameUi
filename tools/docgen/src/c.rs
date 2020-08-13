@@ -2,7 +2,7 @@ use clang::*;
 
 use std::collections::BTreeMap;
 
-use super::{parse_comment, doc};
+use super::{doc, parse_comment};
 
 #[derive(Debug, Clone)]
 pub struct Module<'tu> {

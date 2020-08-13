@@ -1,10 +1,9 @@
-use std::fs::File;
-use std::path::Path;
-use serde::{Serialize, Deserialize};
-use serde_yaml::Value;
-use proc_macro2::{Ident, TokenStream as TokenStream2};
-use quote::{quote, format_ident, TokenStreamExt};
 use proc_macro::TokenStream;
+use proc_macro2::{Ident, TokenStream as TokenStream2};
+use quote::{format_ident, quote, TokenStreamExt};
+use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
+use std::{fs::File, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Spec {
@@ -112,9 +111,9 @@ fn build_struct(name: &str, is_type: bool, attrs: &Vec<Attribute>, base_ident: I
       Value::Number(x) => {
         let f = x.as_f64().unwrap();
         quote!(#f)
-      },
+      }
 
-      _ => unimplemented!()
+      _ => unimplemented!(),
     };
 
     defaults.push(quote!(#ident : #default));
@@ -217,7 +216,12 @@ pub fn generate(_: TokenStream) -> TokenStream {
     }
   ));
 
-  let path = Path::new(file!()).join("../spec.yml").canonicalize().unwrap().display().to_string();
+  let path = Path::new(file!())
+    .join("../spec.yml")
+    .canonicalize()
+    .unwrap()
+    .display()
+    .to_string();
 
   tokens.append_all(quote!(
     const _SPEC_YAML: &str = include_str!(#path);
@@ -246,9 +250,12 @@ pub fn generate(_: TokenStream) -> TokenStream {
       Self::#ident => write!(f, #name)
     ));
 
-    tokens.append_all(
-      build_struct(&ty.name, true, ty.attrs.as_ref().unwrap_or(&Vec::new()), format_ident!("BaseElementAttributes"))
-    );
+    tokens.append_all(build_struct(
+      &ty.name,
+      true,
+      ty.attrs.as_ref().unwrap_or(&Vec::new()),
+      format_ident!("BaseElementAttributes"),
+    ));
   }
 
   tokens.append_all(quote!(
@@ -316,7 +323,12 @@ pub fn generate(_: TokenStream) -> TokenStream {
     ));
 
     let base_ident = format_ident!("{}TypeElementAttributes", uppercase_first(&el.ty));
-    tokens.append_all(build_struct(&el.name, false, el.attrs.as_ref().unwrap_or(&Vec::new()), base_ident));
+    tokens.append_all(build_struct(
+      &el.name,
+      false,
+      el.attrs.as_ref().unwrap_or(&Vec::new()),
+      base_ident,
+    ));
   }
 
   tokens.append_all(quote!(
@@ -372,8 +384,8 @@ pub fn generate(_: TokenStream) -> TokenStream {
   tokens.into()
 }
 
-use syn::{parse_macro_input, parse_quote, ItemStruct};
 use quote::ToTokens;
+use syn::{parse_macro_input, parse_quote, ItemStruct};
 
 #[proc_macro_attribute]
 pub fn element(_: TokenStream, item: TokenStream) -> TokenStream {
@@ -499,5 +511,6 @@ pub fn parse_element(_: TokenStream) -> TokenStream {
         }
       }
     }
-  ).into()
+  )
+  .into()
 }

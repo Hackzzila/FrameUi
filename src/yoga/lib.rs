@@ -6,10 +6,8 @@ pub mod sys {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-use std::fmt;
-use std::ops::Deref;
-use std::ffi::CStr;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{ffi::CStr, fmt, ops::Deref};
 
 use sys::*;
 
@@ -33,7 +31,7 @@ macro_rules! yg_enum {
         }
       }
     }
-  }
+  };
 }
 
 yg_enum!(Align);
@@ -76,9 +74,7 @@ pub struct Node {
 
 impl Node {
   pub unsafe fn new() -> Self {
-    Self {
-      inner: YGNodeNew(),
-    }
+    Self { inner: YGNodeNew() }
   }
 
   pub unsafe fn free(&mut self) {

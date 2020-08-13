@@ -1,10 +1,11 @@
 use crate::{
-  Declaration,
-  StyleRule,
-  selectors::{SelectorParser, SelectorImpl},
+  selectors::{SelectorImpl, SelectorParser},
+  Declaration, StyleRule,
 };
 
-fn parse_yoga_value<'i, 't>(input: &mut cssparser::Parser<'i, 't>) -> Result<yoga::Value, cssparser::BasicParseError<'i>> {
+fn parse_yoga_value<'i, 't>(
+  input: &mut cssparser::Parser<'i, 't>,
+) -> Result<yoga::Value, cssparser::BasicParseError<'i>> {
   if input.try_parse(|input| input.expect_ident_matching("none")).is_ok() {
     Ok(yoga::Value::Undefined)
   } else if input.try_parse(|input| input.expect_ident_matching("auto")).is_ok() {
@@ -14,19 +15,18 @@ fn parse_yoga_value<'i, 't>(input: &mut cssparser::Parser<'i, 't>) -> Result<yog
   } else {
     let start_location = input.current_source_location();
     match input.next()? {
-      cssparser::Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => {
-        Ok(yoga::Value::Px(*value))
-      }
+      cssparser::Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => Ok(yoga::Value::Px(*value)),
 
-      token => {
-        Err(start_location.new_basic_unexpected_token_error(token.clone()))
-      }
+      token => Err(start_location.new_basic_unexpected_token_error(token.clone())),
     }
   }
 }
 
 impl Declaration {
-  pub fn parse<'i, 't>(name: cssparser::CowRcStr<'i>, input: &mut cssparser::Parser<'i, 't>) -> Result<Self, cssparser::BasicParseError<'i>> {
+  pub fn parse<'i, 't>(
+    name: cssparser::CowRcStr<'i>,
+    input: &mut cssparser::Parser<'i, 't>,
+  ) -> Result<Self, cssparser::BasicParseError<'i>> {
     match &*name {
       "width" => Ok(Self::Width(parse_yoga_value(input)?)),
       "height" => Ok(Self::Height(parse_yoga_value(input)?)),
@@ -38,9 +38,7 @@ impl Declaration {
             Err(start_location.new_basic_unexpected_token_error(cssparser::Token::Ident("currentcolor".into())))
           }
 
-          cssparser::Color::RGBA(rgba) => {
-            Ok(Self::BackgroundColor(rgba.red, rgba.green, rgba.blue, rgba.alpha))
-          }
+          cssparser::Color::RGBA(rgba) => Ok(Self::BackgroundColor(rgba.red, rgba.green, rgba.blue, rgba.alpha)),
         }
       }
 

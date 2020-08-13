@@ -12,7 +12,6 @@ fn main() {
   // let f = std::fs::File::open("file.cframe").unwrap();
   // let doc = dom::CompiledDocument::load_from(f);
 
-
   // let doc = Arc::new(doc);
 
   let doc = dom::include_document!("../file.cframe");
@@ -40,19 +39,17 @@ fn main() {
     // println!("{:?}", event);
 
     match &event {
-      glutin::event::Event::WindowEvent { event, .. } => {
-        match event {
-          glutin::event::WindowEvent::CloseRequested => {
-            window.take().unwrap().deinit();
+      glutin::event::Event::WindowEvent { event, .. } => match event {
+        glutin::event::WindowEvent::CloseRequested => {
+          window.take().unwrap().deinit();
 
-            *control_flow =  glutin::event_loop::ControlFlow::Exit;
+          *control_flow = glutin::event_loop::ControlFlow::Exit;
 
-            return;
-          }
-
-          _ => {},
+          return;
         }
-      }
+
+        _ => {}
+      },
 
       glutin::event::Event::LoopDestroyed => {
         return;
@@ -63,7 +60,7 @@ fn main() {
 
     match &mut window {
       Some(window) => window.handle_event(&event),
-      None => {},
+      None => {}
     }
   });
 }

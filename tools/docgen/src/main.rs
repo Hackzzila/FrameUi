@@ -1,6 +1,6 @@
 use clang::*;
 
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 fn parse_comment(comment: String) -> (String, HashMap<String, Option<String>>) {
   let mut description = String::new();
@@ -41,9 +41,12 @@ fn main() {
 
   let mut modules = BTreeMap::new();
 
-  let structs = tu.get_entity().get_children().into_iter().filter(|e| {
-    e.get_kind() == EntityKind::TypedefDecl && !e.is_in_system_header()
-  }).collect::<Vec<_>>();
+  let structs = tu
+    .get_entity()
+    .get_children()
+    .into_iter()
+    .filter(|e| e.get_kind() == EntityKind::TypedefDecl && !e.is_in_system_header())
+    .collect::<Vec<_>>();
 
   for e in structs {
     // println!("{:?} {:?} {:?}", e.get_display_name(), e.get_type(), e.get_typedef_underlying_type());
@@ -70,28 +73,32 @@ fn main() {
 
       match e.get_type().unwrap().get_canonical_type().get_kind() {
         TypeKind::Record => {
-          entry.children.insert(name.clone(), c::Definition::Struct(c::Struct {
-            name,
-            module,
-            methods: BTreeMap::new(),
-            entity: e,
-          }));
+          entry.children.insert(
+            name.clone(),
+            c::Definition::Struct(c::Struct {
+              name,
+              module,
+              methods: BTreeMap::new(),
+              entity: e,
+            }),
+          );
         }
 
         _ => {
-          entry.children.insert(name.clone(), c::Definition::Typedef(c::Typedef {
-            name,
-            entity: e,
-          }));
+          entry
+            .children
+            .insert(name.clone(), c::Definition::Typedef(c::Typedef { name, entity: e }));
         }
       }
     }
   }
 
-  let fns = tu.get_entity().get_children().into_iter().filter(|e| {
-    e.get_kind() == EntityKind::FunctionDecl && !e.is_in_system_header()
-  }).collect::<Vec<_>>();
-
+  let fns = tu
+    .get_entity()
+    .get_children()
+    .into_iter()
+    .filter(|e| e.get_kind() == EntityKind::FunctionDecl && !e.is_in_system_header())
+    .collect::<Vec<_>>();
 
   // println!("{:#?}", modules);
 
@@ -106,13 +113,21 @@ fn main() {
         let struct_name = iter.next().unwrap().to_string();
         let method_name = iter.next().unwrap().to_string();
 
-        let entry = modules.get_mut(module.as_ref().unwrap()).unwrap().children.get_mut(&struct_name).unwrap();
+        let entry = modules
+          .get_mut(module.as_ref().unwrap())
+          .unwrap()
+          .children
+          .get_mut(&struct_name)
+          .unwrap();
 
         if let c::Definition::Struct(entry) = entry {
-          entry.methods.insert(method_name.clone(), c::Method {
-            name: method_name,
-            entity: e,
-          });
+          entry.methods.insert(
+            method_name.clone(),
+            c::Method {
+              name: method_name,
+              entity: e,
+            },
+          );
         }
       }
     }
@@ -122,14 +137,17 @@ fn main() {
     let cxx: Vec<_> = modules.iter().map(|(_, x)| x.to_cxx()).collect();
 
     let mut f = std::fs::File::create("./include/project-a.hpp").unwrap();
-    f.write(b"
+    f.write(
+      b"
     #include <cassert>
 
     namespace frameui {
 
     namespace c_api {
       #include \"project-a.h\"
-    }").unwrap();
+    }",
+    )
+    .unwrap();
 
     for module in cxx {
       f.write(module.as_bytes()).unwrap();

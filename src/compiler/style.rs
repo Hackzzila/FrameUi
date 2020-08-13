@@ -1,23 +1,13 @@
-use std::{
-  fmt,
-  io::prelude::*,
-};
+use std::{fmt, io::prelude::*};
 
-use url::Url;
 use quick_xml::events::BytesStart;
-use serde::{Serialize, Deserialize};
-use source_map_mappings::{Bias, Mappings, parse_mappings};
+use serde::{Deserialize, Serialize};
+use source_map_mappings::{parse_mappings, Bias, Mappings};
+use url::Url;
 
 use style::StyleSheet;
 
-use super::{
-  Context,
-  Level,
-  Reader,
-  Diagnostic,
-  DiagnosticKind,
-  handle_error_with_location,
-};
+use super::{handle_error_with_location, Context, Diagnostic, DiagnosticKind, Level, Reader};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum StyleType {
@@ -73,7 +63,15 @@ impl SourceMap {
 }
 
 impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
-  pub fn compile_style<'a, R: BufRead>(&mut self, e: BytesStart<'a>, empty: bool, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
+  pub fn compile_style<'a, R: BufRead>(
+    &mut self,
+    e: BytesStart<'a>,
+    empty: bool,
+    reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+    url: &Url,
+    file_id: &FileId,
+  ) -> Result<(), ()> {
     buf.clear();
 
     let offset = self.reporter.get_line(&file_id, reader.buffer_position());
@@ -83,9 +81,15 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
       let mut ty = None;
       for attr in e.attributes() {
         let attr = attr.map_err(handle_error_with_location!(self, file_id, reader))?;
-        let key = reader.decode(attr.key).map_err(handle_error_with_location!(self, file_id, reader))?;
-        let value = attr.unescaped_value().map_err(handle_error_with_location!(self, file_id, reader))?;
-        let value = reader.decode(&value).map_err(handle_error_with_location!(self, file_id, reader))?;
+        let key = reader
+          .decode(attr.key)
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
+        let value = attr
+          .unescaped_value()
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
+        let value = reader
+          .decode(&value)
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
 
         match key {
           "src" => {
@@ -115,7 +119,9 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
       }
 
       let src = src.unwrap();
-      let url = url.join(&src).map_err(handle_error_with_location!(self, file_id, reader))?;
+      let url = url
+        .join(&src)
+        .map_err(handle_error_with_location!(self, file_id, reader))?;
 
       let ty = ty.unwrap_or_else(|| {
         let filename = url.path_segments().unwrap().next_back().unwrap();
@@ -137,9 +143,15 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
       let mut ty = None;
       for attr in e.attributes() {
         let attr = attr.map_err(handle_error_with_location!(self, file_id, reader))?;
-        let key = reader.decode(attr.key).map_err(handle_error_with_location!(self, file_id, reader))?;
-        let value = attr.unescaped_value().map_err(handle_error_with_location!(self, file_id, reader))?;
-        let value = reader.decode(&value).map_err(handle_error_with_location!(self, file_id, reader))?;
+        let key = reader
+          .decode(attr.key)
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
+        let value = attr
+          .unescaped_value()
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
+        let value = reader
+          .decode(&value)
+          .map_err(handle_error_with_location!(self, file_id, reader))?;
 
         match key {
           "type" => {
@@ -164,26 +176,26 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
         }
       }
 
-      let text = reader.read_text(e.name(), buf).map_err(handle_error_with_location!(self, file_id, reader))?;
+      let text = reader
+        .read_text(e.name(), buf)
+        .map_err(handle_error_with_location!(self, file_id, reader))?;
       (StyleSource::Data(text), ty.unwrap_or(StyleType::SCSS))
     };
 
     let (css, offset, source) = match ty {
-      StyleType::CSS => {
-        match source {
-          StyleSource::Url(url) => {
-            let mut url_reader = Reader::get(&url).map_err(handle_error_with_location!(self, file_id, reader))?;
-            let mut out = String::new();
-            url_reader.read_to_string(&mut out).map_err(handle_error_with_location!(self, file_id, reader))?;
-            let file_id = self.reporter.add_file(url.to_string(), out.clone());
-            (out, 0, SourceMapOrFileId::FileId(file_id))
-          }
-
-          StyleSource::Data(text) => {
-            (text, offset, SourceMapOrFileId::FileId(file_id.clone()))
-          }
+      StyleType::CSS => match source {
+        StyleSource::Url(url) => {
+          let mut url_reader = Reader::get(&url).map_err(handle_error_with_location!(self, file_id, reader))?;
+          let mut out = String::new();
+          url_reader
+            .read_to_string(&mut out)
+            .map_err(handle_error_with_location!(self, file_id, reader))?;
+          let file_id = self.reporter.add_file(url.to_string(), out.clone());
+          (out, 0, SourceMapOrFileId::FileId(file_id))
         }
-      }
+
+        StyleSource::Data(text) => (text, offset, SourceMapOrFileId::FileId(file_id.clone())),
+      },
 
       ty => {
         let (text, url) = match source {
@@ -191,14 +203,14 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
             let mut url_reader = Reader::get(&url).map_err(handle_error_with_location!(self, file_id, reader))?;
 
             let mut out = String::new();
-            url_reader.read_to_string(&mut out).map_err(handle_error_with_location!(self, file_id, reader))?;
+            url_reader
+              .read_to_string(&mut out)
+              .map_err(handle_error_with_location!(self, file_id, reader))?;
 
             (out, url)
           }
 
-          StyleSource::Data(text) => {
-            (text, Url::parse("file:///C/bar.txt").unwrap())
-          }
+          StyleSource::Data(text) => (text, Url::parse("file:///C/bar.txt").unwrap()),
         };
 
         let ctx = sass::DataContext::new(&text).unwrap();
@@ -210,7 +222,9 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
 
         let compiled = ctx.compile().map_err(|e| {
           let file_id = self.reporter.add_file(e.file().unwrap(), e.src().unwrap());
-          let pos = self.reporter.get_position(&file_id, e.line() as usize - 1, e.column() as usize);
+          let pos = self
+            .reporter
+            .get_position(&file_id, e.line() as usize - 1, e.column() as usize);
           self.reporter.add_diagnostic(Diagnostic {
             location: Some((file_id, pos)),
             min_level: Level::Error,
@@ -230,20 +244,29 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
     self.stylesheet.parse(&mut input).map_err(|e| {
       let location = match source {
         SourceMapOrFileId::FileId(file_id) => {
-          let pos = self.reporter.get_position(&file_id, e.0.location.line as usize, e.0.location.column as usize);
+          let pos = self
+            .reporter
+            .get_position(&file_id, e.0.location.line as usize, e.0.location.column as usize);
           Some((file_id, pos))
         }
 
         SourceMapOrFileId::SourceMap(source_map) => {
-          let original_location = source_map.mappings.original_location_for(e.0.location.line, e.0.location.column, Bias::GreatestLowerBound).unwrap();
+          let original_location = source_map
+            .mappings
+            .original_location_for(e.0.location.line, e.0.location.column, Bias::GreatestLowerBound)
+            .unwrap();
           let original_location = original_location.original.as_ref().unwrap();
 
           let file_id = self.reporter.add_file(
             source_map.sources[original_location.source as usize].clone(),
-            source_map.sources_content[original_location.source as usize].clone()
+            source_map.sources_content[original_location.source as usize].clone(),
           );
 
-          let pos = self.reporter.get_position(&file_id, original_location.original_line as usize, original_location.original_column as usize);
+          let pos = self.reporter.get_position(
+            &file_id,
+            original_location.original_line as usize,
+            original_location.original_column as usize,
+          );
 
           Some((file_id, pos))
         }
