@@ -3,7 +3,6 @@ use std::{
   io::BufReader,
   fs::File,
   fmt,
-  error,
   path::Path,
   sync::{
     RwLock,
@@ -14,125 +13,134 @@ use std::{
 use url::{Url};
 use indextree::{Arena, NodeId};
 use quick_xml::events::{Event, BytesStart};
+use reqwest::blocking::{get, Response};
 
 use dom::{STRUCTURE_VERSION, Element, ElementData, RootElement, UnstyledElement, CompiledDocument};
 use style::StyleSheet;
 
-pub trait IntoUrl<FileId> {
-  fn into_url(&self) -> Result<Url, Error<FileId>>;
+#[path = "style.rs"]
+mod _style;
+
+pub trait IntoUrl {
+  fn into_url(&self) -> Result<Url, DiagnosticKind>;
 }
 
-impl<FileId> IntoUrl<FileId> for &str {
-  fn into_url(&self) -> Result<Url, Error<FileId>> {
+impl IntoUrl for &str {
+  fn into_url(&self) -> Result<Url, DiagnosticKind> {
     Ok(Url::parse(self)?)
   }
 }
 
-impl<T: AsRef<Path>, FileId> IntoUrl<FileId> for &T {
-  fn into_url(&self) -> Result<Url, Error<FileId>> {
+impl<T: AsRef<Path>> IntoUrl for &T {
+  fn into_url(&self) -> Result<Url, DiagnosticKind> {
     let path = self.as_ref().canonicalize()?;
     Ok(Url::from_file_path(path).unwrap())
   }
 }
 
-pub struct Diagnostic<FileId> {
-  pub data: DiagnosticData,
-  pub pos: usize,
-  pub file_id: FileId,
+#[derive(Debug, Clone)]
+pub enum Level {
+  Bug,
+  Error,
+  Warn,
+  Info,
 }
 
-impl<FileId> fmt::Display for Diagnostic<FileId> {
+#[derive(Debug)]
+pub struct Diagnostic<'i, FileId: fmt::Debug> {
+  pub kind: DiagnosticKind<'i>,
+  pub location: Option<(FileId, usize)>,
+  pub min_level: Level,
+}
+
+impl<FileId: fmt::Debug> fmt::Display for Diagnostic<'_, FileId> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.data.fmt(f)
-  }
-}
-
-pub enum DiagnosticData {
-  InvalidElement(String),
-  InvalidContext(String, String, String),
-  InvalidAttribute(String, String),
-  ExpectedSelfClosing,
-  ExpectedClosingTag(String),
-}
-
-impl fmt::Display for DiagnosticData {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::InvalidElement(e) => write!(f, "invalid element {}", e),
-      Self::InvalidContext(name, ty, parent) => write!(f, "element `{}` of type `{}` is not allowed inside `{}`", name, ty, parent),
-      Self::InvalidAttribute(attr, el) => write!(f, "invalid attribute `{}` for `{}`", attr, el),
-      Self::ExpectedSelfClosing => write!(f, "childless elements should be self-closing"),
-      Self::ExpectedClosingTag(e) => write!(f, "element `{}` should have explicit closing tag", e),
-    }
+    self.kind.fmt(f)
   }
 }
 
 #[derive(Debug)]
-pub enum Error<FileId> {
+pub enum DiagnosticKind<'i> {
+  InvalidElement { el: String },
+  InvalidContext { el: String, parent: String },
+  InvalidAttribute { el: String, attr: String },
+  ExpectedSelfClosing { el: String },
+  ExpectedClosingTag { el: String },
+
+  UnexpectedText,
+  UnexpectedCData,
+  UnexpectedDecl,
+  UnexpectedPI,
+  UnexpectedDocType,
+  UnexpectedEof,
+
   IOError(io::Error),
   ReqwestError(reqwest::Error),
-  ParseError(quick_xml::Error, FileId, usize),
+  ParseError(quick_xml::Error),
   UrlParseError(url::ParseError),
+  CssParseError(style::Error<'i>),
+  SassParseError(String),
   MissingNode(NodeId, &'static str, u32, u32),
 }
 
-impl<FileId> fmt::Display for Error<FileId> {
+impl fmt::Display for DiagnosticKind<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Error::IOError(e) => e.fmt(f),
-      Error::ReqwestError(e) => e.fmt(f),
-      Error::ParseError(e, ..) => e.fmt(f),
-      Error::UrlParseError(e) => e.fmt(f),
-      Error::MissingNode(node, file, line, col) => write!(f, "missing node `{}`, {}:{}:{} ", node, file, line, col),
+      Self::InvalidElement { el } => write!(f, "invalid element {}", el),
+      Self::InvalidContext { el, parent } => write!(f, "element `{}` is not allowed inside `{}`", el, parent),
+      Self::InvalidAttribute { el, attr } => write!(f, "invalid attribute `{}` for `{}`", attr, el),
+      Self::ExpectedSelfClosing { el } => write!(f, "childless element `{}` should be self-closing", el),
+      Self::ExpectedClosingTag { el } => write!(f, "element `{}` should have explicit closing tag", el),
+
+      Self::UnexpectedText => write!(f, "unexpected text"),
+      Self::UnexpectedCData => write!(f, "unexpected CDATA"),
+      Self::UnexpectedDecl => write!(f, "unexpected declaration"),
+      Self::UnexpectedPI => write!(f, "unexpected processing instruction"),
+      Self::UnexpectedDocType => write!(f, "unexpected DOCTYPE"),
+      Self::UnexpectedEof => write!(f, "unexpected EOF"),
+
+      Self::IOError(e) => e.fmt(f),
+      Self::ReqwestError(e) => e.fmt(f),
+      Self::ParseError(e) => e.fmt(f),
+      Self::UrlParseError(e) => e.fmt(f),
+      Self::CssParseError(e) => write!(f, "{:?}", e),
+      Self::SassParseError(e) => e.fmt(f),
+      Self::MissingNode(node, file, line, col) => write!(f, "missing node `{}`, {}:{}:{} ", node, file, line, col),
     }
   }
 }
 
-impl<FileId: fmt::Debug> error::Error for Error<FileId> {
-  fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-    match self {
-      Error::IOError(e) => Some(e),
-      Error::ReqwestError(e) => Some(e),
-      Error::ParseError(e, ..) => Some(e),
-      Error::UrlParseError(e) => Some(e),
-      _ => None,
-    }
+impl<'i> From<io::Error> for DiagnosticKind<'i> {
+  fn from(e: io::Error) -> DiagnosticKind<'i> {
+    DiagnosticKind::IOError(e)
   }
 }
 
-impl<FileId> From<io::Error> for Error<FileId> {
-  fn from(e: io::Error) -> Error<FileId> {
-    Error::IOError(e)
+impl<'i> From<reqwest::Error> for DiagnosticKind<'i> {
+  fn from(e: reqwest::Error) -> DiagnosticKind<'i> {
+    DiagnosticKind::ReqwestError(e)
   }
 }
 
-impl<FileId> From<reqwest::Error> for Error<FileId> {
-  fn from(e: reqwest::Error) -> Error<FileId> {
-    Error::ReqwestError(e)
+impl<'i> From<url::ParseError> for DiagnosticKind<'i> {
+  fn from(e: url::ParseError) -> DiagnosticKind<'i> {
+    DiagnosticKind::UrlParseError(e)
   }
 }
 
-impl<FileId> From<url::ParseError> for Error<FileId> {
-  fn from(e: url::ParseError) -> Error<FileId> {
-    Error::UrlParseError(e)
+impl<'i> From<quick_xml::Error> for DiagnosticKind<'i> {
+  fn from(e: quick_xml::Error) -> DiagnosticKind<'i> {
+    DiagnosticKind::ParseError(e)
   }
 }
 
-// impl<FileId> From<quick_xml::Error> for Error<FileId> {
-//   fn from(e: quick_xml::Error) -> Error<FileId> {
-//     Error::ParseError(e)
-//   }
-// }
-
-use reqwest::blocking::{get, Response};
-
-pub enum Reader {
+enum Reader {
   File(BufReader<File>),
   Network(BufReader<Response>),
 }
 
 impl Reader {
-  pub fn get<FileId>(url: &Url) -> Result<Reader, Error<FileId>> {
+  pub fn get(url: &Url) -> Result<Reader, DiagnosticKind> {
     if url.scheme() == "file" {
       let file = File::open(url.to_file_path().unwrap())?;
       let buf = BufReader::new(file);
@@ -171,28 +179,131 @@ impl BufRead for Reader {
 }
 
 pub trait DiagnosticReporter {
-  type FileId;
-  fn add_file(&mut self, url: &Url) -> Result<Self::FileId, Error<Self::FileId>>;
-  fn add_diagnostic(&mut self, diagnostic: Diagnostic<Self::FileId>) -> Result<(), Error<Self::FileId>>;
+  type FileId: fmt::Debug + Clone;
+  fn add_file(&mut self, filename: String, source: String) -> Self::FileId;
+  fn add_diagnostic(&mut self, diagnostic: Diagnostic<Self::FileId>);
+  fn get_position(&mut self, file: &Self::FileId, line: usize, col: usize) -> usize;
+  fn get_line(&mut self, file: &Self::FileId, pos: usize) -> usize;
+  fn checkpoint(&mut self) -> Result<(), ()>;
 }
 
-struct Context<'r, FileId: Clone> {
+struct Context<'r, FileId: fmt::Debug + Clone> {
   body: Arena<dom::Element>,
   root: NodeId,
   reporter: &'r mut dyn DiagnosticReporter<FileId=FileId>,
   stylesheet: StyleSheet,
 }
 
-impl<'r, FileId: Clone> Context<'r, FileId> {
-  fn compile_root<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
+#[macro_export]
+macro_rules! handle_error_with_location {
+  ($ctx:ident, $file_id:ident, $reader:ident) => {
+    |e| {
+      $ctx.reporter.add_diagnostic(crate::Diagnostic {
+        location: Some(($file_id.clone(), $reader.buffer_position())),
+        min_level: crate::Level::Error,
+        kind: e.into(),
+      })
+    }
+  }
+}
+
+#[macro_export]
+
+macro_rules! handle_error {
+  ($reporter:ident) => {
+    |e| {
+      $reporter.add_diagnostic(crate::Diagnostic {
+        location: None,
+        min_level: crate::Level::Error,
+        kind: e.into(),
+      })
+    }
+  }
+}
+
+impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
+  fn handle_event<R: BufRead>(&mut self, event: Event, file_id: &FileId, reader: &mut quick_xml::Reader<R>) -> Result<(), ()>{
+    match event {
+      Event::Text(text) => {
+        let text = text.unescaped().map_err(handle_error_with_location!(self, file_id, reader))?;
+        let text = reader.decode(&text).map_err(handle_error_with_location!(self, file_id, reader))?;
+
+        if text.trim().is_empty() {
+          Ok(())
+        } else {
+          self.reporter.add_diagnostic(Diagnostic {
+            min_level: Level::Error,
+            location: Some((file_id.clone(), reader.buffer_position())),
+            kind: DiagnosticKind::UnexpectedText,
+          });
+          Err(())
+        }
+      }
+
+      Event::CData(..) => {
+        self.reporter.add_diagnostic(Diagnostic {
+          min_level: Level::Error,
+          location: Some((file_id.clone(), reader.buffer_position())),
+          kind: DiagnosticKind::UnexpectedCData,
+        });
+        Err(())
+      }
+
+      Event::Decl(..) => {
+        self.reporter.add_diagnostic(Diagnostic {
+          min_level: Level::Error,
+          location: Some((file_id.clone(), reader.buffer_position())),
+          kind: DiagnosticKind::UnexpectedDecl,
+        });
+        Err(())
+      }
+
+      Event::PI(..) => {
+        self.reporter.add_diagnostic(Diagnostic {
+          min_level: Level::Error,
+          location: Some((file_id.clone(), reader.buffer_position())),
+          kind: DiagnosticKind::UnexpectedPI,
+        });
+        Err(())
+      }
+
+      Event::DocType(..) => {
+        self.reporter.add_diagnostic(Diagnostic {
+          min_level: Level::Error,
+          location: Some((file_id.clone(), reader.buffer_position())),
+          kind: DiagnosticKind::UnexpectedDocType,
+        });
+        Err(())
+      }
+
+      Event::Eof => {
+        self.reporter.add_diagnostic(Diagnostic {
+          min_level: Level::Error,
+          location: Some((file_id.clone(), reader.buffer_position())),
+          kind: DiagnosticKind::UnexpectedEof,
+        });
+        Err(())
+      }
+
+      Event::Comment(..) => {
+        Ok(())
+      }
+
+      _ => {
+        unimplemented!()
+      }
+    }
+  }
+
+  fn compile_root<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
     buf.clear();
 
     let mut found_frame = false;
     loop {
-      match reader.read_event(buf).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))? {
+      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
 
           if name == "Frame" {
             if found_frame == true {
@@ -209,9 +320,7 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
         Event::End(..) => break,
         Event::Eof => break,
 
-        _ => {
-          panic!("unexpected at line {}", line!());
-        },
+        event => self.handle_event(event, file_id, reader)?,
       }
 
       buf.clear();
@@ -220,16 +329,16 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_frame<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
+  fn compile_frame<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
     buf.clear();
 
     let mut found_head = false;
     let mut found_body = false;
     loop {
-      match reader.read_event(buf).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))? {
+      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Head" => {
@@ -254,9 +363,7 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
 
         Event::End(..) => break,
 
-        _ => {
-          panic!("unexpected at line {}", line!());
-        },
+        event => self.handle_event(event, file_id, reader)?,
       }
 
       buf.clear();
@@ -269,14 +376,14 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_head<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
+  fn compile_head<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
     buf.clear();
 
     loop {
-      match reader.read_event(buf).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))? {
+      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Style" => {
@@ -289,7 +396,7 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
 
         Event::Empty(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Style" => {
@@ -302,9 +409,8 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
 
         Event::End(..) => break,
 
-        _ => {
-          panic!("unexpected at line {}", line!());
-        },
+        event => self.handle_event(event, file_id, reader)?,
+
       }
       buf.clear();
     }
@@ -312,66 +418,20 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_style<'a, R: BufRead>(&mut self, e: BytesStart<'a>, empty: bool, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
-    buf.clear();
-
-    let text = if empty {
-      let mut src = None;
-      for attr in e.attributes() {
-        let attr = attr.map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-        let key = reader.decode(attr.key).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-        let value = attr.unescaped_value().map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-        let value = reader.decode(&value).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-
-        match key {
-          "src" => {
-            src = Some(value.to_string());
-          }
-
-          _ => {
-            self.reporter.add_diagnostic(Diagnostic {
-              pos: reader.buffer_position(),
-              file_id: file_id.clone(),
-              data: DiagnosticData::InvalidAttribute(
-                key.to_string(),
-                "Style".to_string(),
-              ),
-            })?;
-          }
-        }
-      }
-
-      let src = src.unwrap();
-      let url = url.join(&src)?;
-      let mut reader = Reader::get(&url)?;
-
-      let mut out = String::new();
-      reader.read_to_string(&mut out)?;
-
-      out
-    } else {
-      reader.read_text(e.name(), buf).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?
-    };
-
-    self.stylesheet.parse(&text);
-
-    Ok(())
-  }
-
-  fn compile_body<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
+  fn compile_body<R: BufRead>(&mut self, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
     buf.clear();
 
     self.compile_ui_element(self.root, reader, buf, url, file_id)
   }
 
-  fn compile_ui_element<R: BufRead>(&mut self, parent: NodeId, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
+  fn compile_ui_element<R: BufRead>(&mut self, parent: NodeId, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
     buf.clear();
 
     loop {
-      match reader.read_event(buf).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))? {
+      match reader.read_event(buf).map_err(handle_error_with_location!(self, file_id, reader))? {
         Event::Start(e) => {
           let name = e.name();
-          let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+          let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
 
           match name {
             "Unstyled" => {
@@ -385,9 +445,7 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
 
         Event::End(..) => break,
 
-        _ => {
-          panic!("unexpected at line {}", line!());
-        },
+        event => self.handle_event(event, file_id, reader)?,
       }
 
       buf.clear();
@@ -396,19 +454,18 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
     Ok(())
   }
 
-  fn compile_unstyled<'a, R: BufRead>(&mut self, e: BytesStart<'a>, parent: NodeId, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), Error<FileId>> {
+  fn compile_unstyled<'a, R: BufRead>(&mut self, e: BytesStart<'a>, parent: NodeId, reader: &mut quick_xml::Reader<R>, buf: &mut Vec<u8>, url: &Url, file_id: &FileId) -> Result<(), ()> {
     buf.clear();
 
-
     let name = e.name();
-    let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+    let name = reader.decode(&name).map_err(handle_error_with_location!(self, file_id, reader))?;
 
     let mut el = Element::new(ElementData::Unstyled(UnstyledElement));
     for attr in e.attributes() {
-      let attr = attr.map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-      let key = reader.decode(attr.key).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-      let value = attr.unescaped_value().map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-      let value = reader.decode(&value).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
+      let attr = attr.map_err(handle_error_with_location!(self, file_id, reader))?;
+      let key = reader.decode(attr.key).map_err(handle_error_with_location!(self, file_id, reader))?;
+      let value = attr.unescaped_value().map_err(handle_error_with_location!(self, file_id, reader))?;
+      let value = reader.decode(&value).map_err(handle_error_with_location!(self, file_id, reader))?;
 
       match key {
         "class" => {
@@ -425,13 +482,13 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
 
         _ => {
           self.reporter.add_diagnostic(Diagnostic {
-            pos: reader.buffer_position(),
-            file_id: file_id.clone(),
-            data: DiagnosticData::InvalidAttribute(
-              key.to_string(),
-              name.to_string(),
-            ),
-          })?;
+            location: Some((file_id.clone(), reader.buffer_position())),
+            min_level: Level::Info,
+            kind: DiagnosticKind::InvalidAttribute {
+              attr: key.to_string(),
+              el: name.to_string(),
+            },
+          });
         }
       }
     }
@@ -443,15 +500,17 @@ impl<'r, FileId: Clone> Context<'r, FileId> {
   }
 }
 
-pub fn compile<URL: IntoUrl<FileId>, FileId: Clone>(url: URL, reporter: &mut dyn DiagnosticReporter<FileId=FileId>) -> Result<CompiledDocument, Error<FileId>> {
-  let url = url.into_url()?;
+pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(url: URL, reporter: &mut dyn DiagnosticReporter<FileId=FileId>) -> Result<CompiledDocument, ()> {
+  let url = url.into_url().map_err(handle_error!(reporter))?;
 
-  let file_id = reporter.add_file(&url)?;
+  let mut out = String::new();
+  let mut reader = Reader::get(&url).map_err(handle_error!(reporter))?;
+  reader.read_to_string(&mut out).map_err(handle_error!(reporter))?;
 
-  let reader = Reader::get(&url)?;
+  let file_id = reporter.add_file(url.to_string(), out);
+
+  let reader = Reader::get(&url).map_err(handle_error!(reporter))?;
   let mut reader = quick_xml::Reader::from_reader(reader);
-  reader.trim_text(true);
-  // reader.expand_empty_elements(true);
   reader.check_comments(true);
 
   let mut buf = Vec::new();
@@ -468,6 +527,8 @@ pub fn compile<URL: IntoUrl<FileId>, FileId: Clone>(url: URL, reporter: &mut dyn
 
   ctx.compile_root(&mut reader, &mut buf, &url, &file_id)?;
 
+  ctx.reporter.checkpoint()?;
+
   let doc = CompiledDocument {
     version: STRUCTURE_VERSION,
     elements: RwLock::new(ctx.body),
@@ -478,157 +539,4 @@ pub fn compile<URL: IntoUrl<FileId>, FileId: Clone>(url: URL, reporter: &mut dyn
   doc.init_yoga();
 
   Ok(doc)
-
-  // compile_root(&mut ctx, &mut reader, &mut buf, reporter, file_id.clone())?;
-
-  // loop {
-  //   match reader.read_event(&mut buf).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))? {
-  //     Event::Start(e) => {
-  //       let name = e.name();
-  //       let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-  //       let el = spec::parse_element!();
-
-  //       let parent = elements.get(current)
-  //         .ok_or(Error::MissingNode(current, file!(), line!(), column!()))?
-  //         .get();
-
-  //       if !el.is_error() {
-  //         if !parent.get_children().contains(&el.get_type()) {
-  //           reporter.add_diagnostic(Diagnostic {
-  //             pos: reader.buffer_position(),
-  //             file_id: file_id.clone(),
-  //             data: DiagnosticData::InvalidContext(
-  //               el.get_name().to_string(),
-  //               el.get_type().to_string(),
-  //               parent.get_name().to_string(),
-  //             ),
-  //           })?;
-  //         }
-
-  //         if el.get_children().is_empty() {
-  //           reporter.add_diagnostic(Diagnostic {
-  //             pos: reader.buffer_position(),
-  //             file_id: file_id.clone(),
-  //             data: DiagnosticData::ExpectedSelfClosing
-  //           })?;
-  //         }
-  //       }
-
-  //       let node = elements.new_node(el);
-  //       current.append(node, &mut elements);
-  //       current = node;
-  //     }
-
-  //     Event::End(..) => {
-  //       current = current.ancestors(&elements)
-  //         .nth(1)
-  //         .ok_or(Error::MissingNode(current, file!(), line!(), column!()))?;
-  //     }
-
-  //     Event::Empty(e) => {
-  //       let name = e.name();
-  //       let name = reader.decode(&name).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?;
-  //       let el = spec::parse_element!();
-
-  //       let parent = elements.get(current)
-  //         .ok_or(Error::MissingNode(current, file!(), line!(), column!()))?
-  //         .get();
-
-  //       if !el.is_error() {
-  //         if !parent.get_children().contains(&el.get_type()) {
-  //           reporter.add_diagnostic(Diagnostic {
-  //             pos: reader.buffer_position(),
-  //             file_id: file_id.clone(),
-  //             data: DiagnosticData::InvalidContext(
-  //               el.get_name().to_string(),
-  //               el.get_type().to_string(),
-  //               parent.get_name().to_string(),
-  //             ),
-  //           })?;
-  //         }
-
-  //         if el.get_children().is_empty() {
-  //           reporter.add_diagnostic(Diagnostic {
-  //             pos: reader.buffer_position(),
-  //             file_id: file_id.clone(),
-  //             data: DiagnosticData::ExpectedSelfClosing
-  //           })?;
-  //         }
-  //       }
-
-  //       let node = elements.new_node(el);
-  //       current.append(node, &mut elements);
-  //     }
-
-  //     Event::Text(e) => {
-  //       let el = Element::Text(e.unescape_and_decode(&reader).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?);
-
-  //       let parent = elements.get(current)
-  //         .ok_or(Error::MissingNode(current, file!(), line!(), column!()))?
-  //         .get();
-
-  //       if !parent.get_children().contains(&el.get_type()) {
-  //         reporter.add_diagnostic(Diagnostic {
-  //           pos: reader.buffer_position(),
-  //           file_id: file_id.clone(),
-  //           data: DiagnosticData::InvalidContext(
-  //             el.get_name().to_string(),
-  //             el.get_type().to_string(),
-  //             parent.get_name().to_string(),
-  //           ),
-  //         })?;
-  //       }
-
-  //       current.append(elements.new_node(el), &mut elements);
-  //     }
-
-  //     // Event::CData(e) => {
-  //     //   current.append(elements.new_node(Element::CData(e.unescape_and_decode(&reader)?)), &mut elements);
-  //     // }
-
-  //     Event::Comment(e) => {
-  //       let el = Element::Comment(e.unescape_and_decode(&reader).map_err(|e| Error::ParseError(e, file_id.clone(), reader.buffer_position()))?);
-
-  //       let parent = elements.get(current)
-  //         .ok_or(Error::MissingNode(current, file!(), line!(), column!()))?
-  //         .get();
-
-  //       if !parent.get_children().contains(&el.get_type()) {
-  //         reporter.add_diagnostic(Diagnostic {
-  //           pos: reader.buffer_position(),
-  //           file_id: file_id.clone(),
-  //           data: DiagnosticData::InvalidContext(
-  //             el.get_name().to_string(),
-  //             el.get_type().to_string(),
-  //             parent.get_name().to_string(),
-  //           ),
-  //         })?;
-  //       }
-
-  //       current.append(elements.new_node(el), &mut elements);
-  //     }
-
-  //     // Event::PI(e) => {
-  //     //   current.append(elements.new_node(Element::ProcessingInstruction(e.unescape_and_decode(&reader)?)), &mut elements);
-  //     // }
-
-  //     Event::Eof => break,
-  //     _ => {},
-  //   }
-  //   buf.clear();
-  // }
-
-  // Ok(())
-
-  // let page = Page {
-  //   root,
-  //   elements: RwLock::new(elements),
-  //   devtools: DashMap::new(),
-  // };
-
-  // Ok(View {
-  //   version: STRUCTURE_VERSION,
-  //   pages: vec![page],
-  //   current_page: AtomicUsize::new(0),
-  // })
 }

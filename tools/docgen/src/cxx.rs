@@ -12,18 +12,6 @@ fn uppercase_first(s: &str) -> String {
   }
 }
 
-pub fn to_camel_case(s: &str) -> String {
-  let mut i = 0;
-  s.split("_").map(|x| {
-    i += 1;
-    if i != 1 {
-      uppercase_first(x)
-    } else {
-      x.to_string()
-    }
-  }).collect::<String>()
-}
-
 pub fn to_pascal_case(s: &str) -> String {
   s.split("_").map(|x| {
     uppercase_first(x)
@@ -68,18 +56,18 @@ impl Struct<'_> {
         public:
           {}
 
-          ::{0} *GetInternalPointer() {{
+          c_api::{0} *GetInternalPointer() {{
             return self;
           }}
 
-          ::{0} *TakeInternalPointer() {{
-            ::{0} *out = self;
+          c_api::{0} *TakeInternalPointer() {{
+            c_api::{0} *out = self;
             self = nullptr;
             return out;
           }}
 
         private:
-          ::{0} *self = nullptr;
+          c_api::{0} *self = nullptr;
       }};
     ", self.name, methods)
   }
@@ -130,7 +118,7 @@ impl Method<'_> {
       MethodKind::Constructor => {
         format!("
           {struct_name}({args}) {{
-            self = {c_name}({c_args});
+            self = c_api::{c_name}({c_args});
           }}",
           struct_name=struct_name,
           args=args,
@@ -143,7 +131,7 @@ impl Method<'_> {
         format!("
           ~{struct_name}() {{
             if (self) {{
-              {c_name}(self);
+              c_api::{c_name}(self);
             }}
           }}",
           struct_name=struct_name,
@@ -155,7 +143,7 @@ impl Method<'_> {
         format!("
           {static_keyword} {ret} {name}({args}) {{
             assert(self != nullptr);
-            return {c_name}({c_args});
+            return c_api::{c_name}({c_args});
           }}",
           static_keyword=if kind == MethodKind::StaticMethod { "static" } else { "" },
           ret=return_type,

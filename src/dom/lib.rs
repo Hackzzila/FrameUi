@@ -40,6 +40,10 @@ impl Element {
     unsafe {
       self.yg.set_width(self.computed.width);
       self.yg.set_height(self.computed.height);
+      self.yg.set_margin(yoga::Edge::Top, self.computed.margin_top);
+      self.yg.set_margin(yoga::Edge::Bottom, self.computed.margin_bottom);
+      self.yg.set_margin(yoga::Edge::Left, self.computed.margin_left);
+      self.yg.set_margin(yoga::Edge::Right, self.computed.margin_right);
     }
   }
 
@@ -338,192 +342,9 @@ impl<'a> selectors::Element for MatchingElement<'a> {
   }
 }
 
-// include!(concat!(env!("OUT_DIR"), "/elements.rs"));
-// spec::generate!();
-
-// // #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct BaseElement {
-//   class: String,
-//   id: String,
-//   style: String,
-// }
-
-// #[derive(Debug, Default)]
-// pub struct ButtonElement {}
-
-// // #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct ChildlessElement {}
-
-// #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-// pub enum ElementType {
-//   Base,
-//   Text,
-//   Comment,
-// }
-
-// #[derive(Debug)]
-// pub enum Element {
-//   Root,
-//   Text(String),
-//   Comment(String),
-//   Error,
-//   Button(ButtonElement),
-//   Childless(ChildlessElement),
-// }
-
-// impl Element {
-//   pub fn is_error(&self) -> bool {
-//     match self {
-//       Self::Error => true,
-//       _ => false,
-//     }
-//   }
-
-//   pub fn get_name(&self) -> &str {
-//     match self {
-//       Self::Root => "#root",
-//       Self::Text(..) => "#text",
-//       Self::Comment(..) => "#comment",
-//       Self::Error => "#error",
-//       Self::Button(..) => "Button",
-//       Self::Childless(..) => "Childless",
-//     }
-//   }
-
-//   pub fn get_type(&self) -> ElementType {
-//     match self {
-//       Self::Root => ElementType::Base,
-//       Self::Text(..) => ElementType::Text,
-//       Self::Comment(..) => ElementType::Comment,
-//       Self::Error => ElementType::Base,
-//       Self::Button(..) => ElementType::Base,
-//       Self::Childless(..) => ElementType::Base,
-//     }
-//   }
-
-//   pub fn get_children(&self) -> &[ElementType] {
-//     match self {
-//       Self::Root => &[ElementType::Base, ElementType::Comment],
-//       Self::Text(..) => &[],
-//       Self::Comment(..) => &[],
-//       Self::Error => &[],
-//       Self::Button(..) => &[ElementType::Base],
-//       Self::Childless(..) => &[],
-//     }
-//   }
-// }
-
-// #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct FileTypeElement {}
-
-// #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct FrameTypeElement {}
-
-// #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct UiTypeElement {
-//   style: (),
-// }
-
-// #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct FrameElement {}
-
-// #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct HeadElement {}
-
-// #[spec::element]
-// #[derive(Debug, Default)]
-// pub struct BodyElement {}
-
-// #[spec::element]
-
-// #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-// #[derive(Debug)]
-// pub enum Element {
-//   Root,
-//   StdElement(std_elements::Element),
-//   Text(String),
-//   // CData(String),
-//   Comment(String),
-//   // ProcessingInstruction(String),
-// }
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct View {
-//   pub version: u8,
-//   pub pages: Vec<Page>,
-//   pub current_page: AtomicUsize,
-// }
-
-// impl fmt::Display for View {
-//   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//     self.pages.get(self.current_page.load(Ordering::Relaxed)).ok_or(fmt::Error)?.fmt(f)
-//   }
-// }
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct Page {
-//   pub elements: RwLock<Arena<Element>>,
-//   pub root: NodeId,
-
-//   #[cfg(feature = "devtools")]
-//   #[doc(hidden)]
-//   #[serde(skip)]
-//   pub devtools: dashmap::DashMap<&'static str, Box<dyn Any + Send + Sync>>,
-// }
-
-// impl fmt::Display for Page {
-//   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//     let mut depth = 0;
-
-//     let elements = self.elements.read().map_err(|_| fmt::Error)?;
-
-//     for e in self.root.traverse(&elements) {
-//       match e {
-//         NodeEdge::Start(x) => {
-//           writeln!(f, "{}{:?}", "  ".repeat(depth), elements.get(x).ok_or(fmt::Error)?.get())?;
-//           depth += 1;
-//         }
-
-//         NodeEdge::End(_) => {
-//           depth -= 1;
-//         }
-//       }
-//     }
-
-//     Ok(())
-//   }
-// }
-
-// #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-// pub enum Element {
-//   View,
-//   Page,
-//   Meta,
-//   Body,
-//   Text(String),
-//   CData(String),
-//   Comment(String),
-//   ProcessingInstruction(String),
-// }
-
-// impl fmt::Display for Element {
-//   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//     match self {
-//       Element::View => write!(f, "<View>"),
-//       Element::Page => write!(f, "<Page>"),
-//       Element::Meta => write!(f, "<Meta>"),
-//       Element::Body => write!(f, "<Body>"),
-//       Element::Text(..) => write!(f, "#text"),
-//       Element::CData(..) => write!(f, "#cdata"),
-//       Element::Comment(..) => write!(f, "#comment"),
-//       Element::ProcessingInstruction(s) => write!(f, "<?{}?>", s),
-//     }
-//   }
-// }
+#[macro_export]
+macro_rules! include_document {
+  ($file:expr) => {
+    ::std::sync::Arc::new(::project_a::dom::CompiledDocument::load(include_bytes!($file)))
+  }
+}

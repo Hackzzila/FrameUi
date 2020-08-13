@@ -7,6 +7,19 @@ use gleam::gl;
 
 use super::*;
 
+#[repr(C)]
+#[doc="module=render"]
+pub struct DeviceSize {
+  pub width: i32,
+  pub height: i32,
+}
+
+impl Into<super::DeviceSize> for DeviceSize {
+  fn into(self) -> super::DeviceSize {
+    super::DeviceSize::new(self.width, self.height)
+  }
+}
+
 #[doc="module=render"]
 pub struct Gl;
 
@@ -77,7 +90,7 @@ impl Renderer {
   ) -> *mut Self {
     let gl = *Box::from_raw(gl as *mut _);
 
-    let renderer = Renderer::new(gl, device_pixel_ratio, device_size, Box::new(Notifier));
+    let renderer = Renderer::new(gl, device_pixel_ratio, device_size.into(), Box::new(Notifier));
 
     Box::into_raw(Box::new(renderer))
   }
@@ -92,7 +105,7 @@ impl Renderer {
   #[no_mangle]
   #[doc="module=render,index=2"]
   pub unsafe extern fn Renderer_set_device_size(&mut self, size: DeviceSize) {
-    self.set_device_size(size);
+    self.set_device_size(size.into());
   }
 
   #[no_mangle]
@@ -103,7 +116,9 @@ impl Renderer {
 
   #[no_mangle]
   #[doc="module=render,index=4"]
-  pub unsafe extern fn Renderer_render(&mut self, inner: bool) {
-    self.render(inner);
+  pub unsafe extern fn Renderer_render(&mut self, inner: bool, doc: *const dom::CompiledDocument) {
+    let doc = Arc::from_raw(doc);
+    self.render(inner, &doc);
+    Arc::into_raw(doc);
   }
 }

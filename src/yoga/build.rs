@@ -42,6 +42,7 @@ fn main() {
     .flag_if_supported("-std=c++11")
     .flag_if_supported("-DYG_ENABLE_EVENTS")
     .flag_if_supported("-fPIC")
+    // .flag_if_supported("/std:c++11")
     .cpp(true)
     .include("yoga")
     .define("DEBUG", None)

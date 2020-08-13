@@ -44,6 +44,11 @@ impl Declaration {
         }
       }
 
+      "margin-top" => Ok(Self::MarginTop(parse_yoga_value(input)?)),
+      "margin-bottom" => Ok(Self::MarginBottom(parse_yoga_value(input)?)),
+      "margin-left" => Ok(Self::MarginLeft(parse_yoga_value(input)?)),
+      "margin-right" => Ok(Self::MarginRight(parse_yoga_value(input)?)),
+
       _ => Err(cssparser::BasicParseError {
         kind: cssparser::BasicParseErrorKind::QualifiedRuleInvalid,
         location: input.current_source_location(),

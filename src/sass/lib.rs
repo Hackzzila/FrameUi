@@ -10,6 +10,7 @@ use std::str::Utf8Error;
 use std::ffi::{CStr, CString, NulError};
 use std::marker::PhantomData;
 
+#[derive(Debug)]
 pub struct FileContext {
   file_ctx: *mut sys::Sass_File_Context,
   ctx: *mut sys::Sass_Context,
@@ -63,6 +64,61 @@ impl Drop for FileContext {
   }
 }
 
+#[derive(Debug)]
+pub struct DataContext {
+  data_ctx: *mut sys::Sass_Data_Context,
+  ctx: *mut sys::Sass_Context,
+}
+
+impl DataContext {
+  pub fn new(source_string: &str) -> Result<Self, NulError> {
+    let source_string = CString::new(source_string)?;
+    unsafe {
+      let data_ctx = sys::sass_make_data_context(sys::sass_copy_c_string(source_string.as_ptr()));
+      Ok(Self {
+        data_ctx,
+        ctx: sys::sass_data_context_get_context(data_ctx),
+      })
+    }
+  }
+
+  pub fn options<'ctx>(&'ctx self) -> Options<'ctx> {
+    unsafe {
+      Options {
+        opts: sys::sass_context_get_options(self.ctx),
+        _phantom: PhantomData,
+      }
+    }
+  }
+
+  pub fn compile<'ctx>(&'ctx self) -> Result<Compiled<'ctx>, Error<'ctx>> {
+    unsafe {
+      let status = sys::sass_compile_data_context(self.data_ctx);
+
+      if status == 0 {
+        Ok(Compiled {
+          ctx: self.ctx,
+          _phantom: PhantomData,
+        })
+      } else {
+        Err(Error {
+          ctx: self.ctx,
+          _phantom: PhantomData,
+        })
+      }
+    }
+  }
+}
+
+impl Drop for DataContext {
+  fn drop(&mut self) {
+    unsafe {
+      sys::sass_delete_data_context(self.data_ctx);
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct Options<'ctx> {
   opts: *mut sys::Sass_Options,
   _phantom: PhantomData<&'ctx ()>,
@@ -82,8 +138,23 @@ impl Options<'_> {
       sys::sass_option_set_source_map_contents(self.opts, value);
     }
   }
+
+  pub fn set_is_indented_syntax_src(&self, value: bool) {
+    unsafe {
+      sys::sass_option_set_is_indented_syntax_src(self.opts, value);
+    }
+  }
+
+  pub fn set_input_path(&self, value: &str) -> Result<(), NulError> {
+    unsafe {
+      let value = CString::new(value)?;
+      sys::sass_option_set_input_path(self.opts, value.as_ptr());
+      Ok(())
+    }
+  }
 }
 
+#[derive(Debug)]
 pub struct Compiled<'ctx> {
   ctx: *mut sys::Sass_Context,
   _phantom: PhantomData<&'ctx ()>,
@@ -109,6 +180,7 @@ impl Compiled<'_> {
   }
 }
 
+#[derive(Debug)]
 pub struct Error<'ctx> {
   ctx: *mut sys::Sass_Context,
   _phantom: PhantomData<&'ctx ()>,

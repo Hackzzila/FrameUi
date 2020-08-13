@@ -8,6 +8,8 @@
 
 #define STRUCTURE_VERSION 0
 
+typedef struct CompiledDocument CompiledDocument;
+
 typedef struct EventHandler_CWindowing EventHandler_CWindowing;
 
 #if defined(MODULE_RENDER)
@@ -29,21 +31,15 @@ typedef struct Renderer Renderer;
 typedef EventHandler_CWindowing EventHandler;
 #endif
 
+#if defined(MODULE_RENDER)
 /**
- * A 2d size tagged with a unit.
+ *module=render
  */
 typedef struct {
-  /**
-   * The extent of the element in the `U` units along the `x` axis (usually horizontal).
-   */
   int32_t width;
-  /**
-   * The extent of the element in the `U` units along the `y` axis (usually vertical).
-   */
   int32_t height;
-} Size2D_i32__DevicePixel;
-
-typedef Size2D_i32__DevicePixel DeviceSize;
+} DeviceSize;
+#endif
 
 #if defined(MODULE_EVENT)
 /**
@@ -115,10 +111,11 @@ void EventHandler_handle_scale_factor_change(EventHandler *self,
  *module=event,index=0
  */
 EventHandler *EventHandler_new(Renderer *renderer,
+                               const CompiledDocument *doc,
                                EmptyCallback swap_buffers,
                                EmptyCallback make_current,
                                EmptyCallback make_not_current,
-                               void *user) CF_SWIFT_NAME(EventHandler.new(renderer:swap_buffers:make_current:make_not_current:user:));
+                               void *user) CF_SWIFT_NAME(EventHandler.new(renderer:doc:swap_buffers:make_current:make_not_current:user:));
 #endif
 
 #if defined(MODULE_EVENT)
@@ -163,7 +160,9 @@ Renderer *Renderer_new(Gl *gl,
 /**
  *module=render,index=4
  */
-void Renderer_render(Renderer *self, bool inner) CF_SWIFT_NAME(Renderer.render(self:inner:));
+void Renderer_render(Renderer *self,
+                     bool inner,
+                     const CompiledDocument *doc) CF_SWIFT_NAME(Renderer.render(self:inner:doc:));
 #endif
 
 #if defined(MODULE_RENDER)

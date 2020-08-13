@@ -13,8 +13,8 @@ use euclid::Size2D;
 use std::sync::Arc;
 use dom::CompiledDocument;
 
-// #[cfg(feature="c-render")]
-// pub mod c_api;
+#[cfg(feature="c-render")]
+pub mod c_api;
 
 // pub trait HandyDandyRectBuilder {
 //   fn to(&self, x2: i32, y2: i32) -> LayoutRect;

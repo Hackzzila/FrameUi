@@ -19,6 +19,7 @@ members = [
   "src/compiler",
   "src/devtools-protocol",
   "src/dom",
+  "src/event",
   "src/render",
   "src/sass",
   "src/spec",
@@ -39,7 +40,6 @@ c-event = ["r-event", "event/c-event"]
 r-render = ["render"]
 c-render = ["r-render", "render/c-render"]
 r-winit-adapter = ["winit-adapter"]
-# c-api = ["render/c-api"]
 
 [dependencies]
 dom = { path = "src/dom", optional = true }
@@ -48,9 +48,5 @@ chrome_devtools = { path = "src/chrome_devtools", optional = true }
 event = { path = "src/event", optional = true }
 render = { path = "src/render", optional = true, features = ["debug"] }
 winit-adapter = { path = "src/winit-adapter", optional = true }
-
-yoga = { path = "src/yoga" }
-sass = { path = "src/sass" }
-spec = { path = "src/spec" }
 
 pretty_env_logger = "0.4"

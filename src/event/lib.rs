@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// #[cfg(feature="c-event")]
-// pub mod c_api;
+#[cfg(feature="c-event")]
+pub mod c_api;
 
 use std::sync::Arc;
 use dom::CompiledDocument;
@@ -46,7 +46,7 @@ impl<W: Windowing> EventHandler<W> {
 
     match event {
       Event::Resized(size) => {
-        self.renderer.set_device_size(size);
+        self.renderer.set_device_size(size.into());
         render_inner = true;
       }
 

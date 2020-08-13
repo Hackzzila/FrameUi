@@ -35,6 +35,7 @@ impl EventHandler {
   #[doc="module=event,index=0"]
   pub unsafe extern fn EventHandler_new(
     renderer: *mut render::Renderer,
+    doc: *const dom::CompiledDocument,
     swap_buffers: EmptyCallback,
     make_current: EmptyCallback,
     make_not_current: EmptyCallback,
@@ -44,7 +45,7 @@ impl EventHandler {
       user, swap_buffers, make_current, make_not_current,
     };
 
-    let event_handler = EventHandler::new(windowing, *Box::from_raw(renderer));
+    let event_handler = EventHandler::new(windowing, *Box::from_raw(renderer), Arc::from_raw(doc));
 
     Box::into_raw(Box::new(event_handler))
   }

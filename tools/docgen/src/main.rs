@@ -37,7 +37,7 @@ mod doc;
 fn main() {
   let clang = Clang::new().unwrap();
   let index = Index::new(&clang, false, false);
-  let tu = index.parser("../../include/project-a.h").parse().unwrap();
+  let tu = index.parser("./include/project-a.h").parse().unwrap();
 
   let mut modules = BTreeMap::new();
 
@@ -118,7 +118,29 @@ fn main() {
     }
   }
 
-  println!("{}", modules.get("event").unwrap().to_cxx());
+  {
+    let cxx: Vec<_> = modules.iter().map(|(_, x)| x.to_cxx()).collect();
+
+    let mut f = std::fs::File::create("./include/project-a.hpp").unwrap();
+    f.write(b"
+    #include <cassert>
+
+    namespace frameui {
+
+    namespace c_api {
+      #include \"project-a.h\"
+    }").unwrap();
+
+    for module in cxx {
+      f.write(module.as_bytes()).unwrap();
+    }
+
+    f.write(b"}").unwrap();
+  }
+
+  let _ = std::process::Command::new("clang-format")
+    .args(&["--style=google", "-i", "include/project-a.hpp"])
+    .status();
 
   let mut modules: Vec<_> = modules.iter().map(|(_, x)| x.to_docs()).collect();
   modules.sort_by_key(|x| x.name.clone());
@@ -143,6 +165,6 @@ fn main() {
   // let json = serde_json::to_string(&docs).unwrap();
 
   use std::io::prelude::*;
-  let mut f = std::fs::File::create("../../doc/src/doc.json").unwrap();
+  let mut f = std::fs::File::create("./doc/src/doc.json").unwrap();
   f.write_all(json.as_bytes()).unwrap();
 }

@@ -126,6 +126,28 @@ impl Node {
     }
   }
 
+  pub unsafe fn set_margin(&mut self, edge: Edge, value: Value) {
+    match value {
+      Value::Px(v) => YGNodeStyleSetMargin(**self, edge, v),
+      Value::Percent(v) => YGNodeStyleSetMarginPercent(**self, edge, v),
+      Value::Auto => YGNodeStyleSetMarginAuto(**self, edge),
+      Value::Undefined => YGNodeStyleSetMargin(**self, edge, f32::NAN),
+    }
+  }
+
+  pub unsafe fn set_padding(&mut self, edge: Edge, value: Value) {
+    match value {
+      Value::Px(v) => YGNodeStyleSetPadding(**self, edge, v),
+      Value::Percent(v) => YGNodeStyleSetPaddingPercent(**self, edge, v),
+      Value::Auto => unimplemented!(),
+      Value::Undefined => YGNodeStyleSetPadding(**self, edge, f32::NAN),
+    }
+  }
+
+  pub unsafe fn set_position_type(&mut self, position: PositionType) {
+    YGNodeStyleSetPositionType(**self, position);
+  }
+
   pub unsafe fn set_display(&mut self, display: Display) {
     YGNodeStyleSetDisplay(**self, display);
   }

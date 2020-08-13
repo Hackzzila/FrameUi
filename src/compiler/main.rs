@@ -1,16 +1,15 @@
-use compiler::compile;
-
-use compiler::{Error, DiagnosticData};
-use std::io::prelude::*;
-use url::Url;
 use std::path::Path;
 
+use cssparser::ToCss;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::SimpleFiles;
+use codespan_reporting::files::{SimpleFiles, Files};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term;
 
+use compiler::{compile, Level, DiagnosticKind};
+
 struct DiagnosticPrinter {
+  should_exit: bool,
   writer: StandardStream,
   config: codespan_reporting::term::Config,
   files: SimpleFiles<String, String>,
@@ -19,63 +18,51 @@ struct DiagnosticPrinter {
 impl DiagnosticPrinter {
   fn new() -> Self {
     Self {
-      writer: StandardStream::stderr(ColorChoice::Always),
+      should_exit: false,
+      writer: StandardStream::stderr(ColorChoice::Auto),
       config: codespan_reporting::term::Config::default(),
       files: SimpleFiles::new(),
     }
-  }
-
-  fn handle_error(&self, err: Error<usize>) {
-    let diagnostic = match err {
-      Error::ParseError(err, file_id, pos) => {
-        Diagnostic::error()
-          .with_message("parsing error")
-          .with_code("E0000")
-          .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(err.to_string()),
-          ])
-      }
-
-      _ => {
-        Diagnostic::error()
-          .with_message(err.to_string())
-          .with_code("E0000")
-      }
-    };
-
-    term::emit(&mut self.writer.lock(), &self.config, &self.files, &diagnostic).unwrap();
   }
 }
 
 impl compiler::DiagnosticReporter for DiagnosticPrinter {
   type FileId = usize;
 
-  fn add_file(&mut self, url: &Url) -> Result<Self::FileId, Error<Self::FileId>> {
-    let file_name = url.path_segments().unwrap().next_back().unwrap().to_string();
-
-    let mut reader = compiler::Reader::get(url)?;
-    let mut contents = String::new();
-    reader.read_to_string(&mut contents)?;
-
-    Ok(self.files.add(file_name, contents))
+  fn add_file(&mut self, filename: String, source: String) -> Self::FileId {
+    self.files.add(filename, source)
   }
 
-  fn add_diagnostic(&mut self, diagnostic: compiler::Diagnostic<Self::FileId>) -> Result<(), Error<Self::FileId>> {
-    let file_id = diagnostic.file_id;
-    let pos = diagnostic.pos;
+  fn get_position(&mut self, file: &Self::FileId, line: usize, col: usize) -> usize {
+    self.files.line_range(*file, line).unwrap().start + col - 1
+  }
 
-    let diagnostic = match diagnostic.data {
-      // Diag::ParseError(err) => {
-      //   Diagnostic::error()
-      //     .with_message("parsing error")
-      //     .with_code("E0000")
-      //     .with_labels(vec![
-      //       Label::primary(file_id, pos..pos).with_message(err.to_string()),
-      //     ])
-      // }
+  fn get_line(&mut self, file: &Self::FileId, pos: usize) -> usize {
+    self.files.line_index(*file, pos).unwrap()
+  }
 
-      DiagnosticData::ExpectedSelfClosing => {
-        Diagnostic::warning()
+  fn add_diagnostic(&mut self, diagnostic: compiler::Diagnostic<Self::FileId>) {
+    let location = diagnostic.location;
+
+    let codespan_diagnostic = match diagnostic.min_level {
+      Level::Bug => {
+        self.should_exit = true;
+        Diagnostic::bug()
+      }
+
+      Level::Error => {
+        self.should_exit = true;
+        Diagnostic::error()
+      },
+
+      Level::Warn => Diagnostic::warning(),
+      Level::Info => Diagnostic::note(),
+    };
+
+    let diagnostic = match diagnostic.kind {
+      DiagnosticKind::ExpectedSelfClosing {..} => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
           .with_message("childless elements should be self-closing")
           .with_code("E0000")
           .with_labels(vec![
@@ -84,19 +71,21 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
           ])
       }
 
-      DiagnosticData::ExpectedClosingTag(name) => {
-        Diagnostic::warning()
+      DiagnosticKind::ExpectedClosingTag { el } => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
           .with_message("element should have explicit closing tag")
           .with_code("E0000")
           .with_labels(vec![
             Label::primary(file_id, pos..pos).with_message("expected explicit closing tag"),
             Label::secondary(file_id, pos-2..pos-1).with_message("help: remove`/`"),
-            Label::secondary(file_id, pos..pos).with_message(format!("help: add `</{}>`", name)),
+            Label::secondary(file_id, pos..pos).with_message(format!("help: add `</{}>`", el)),
           ])
       }
 
-      DiagnosticData::InvalidAttribute(attr, el) => {
-        Diagnostic::error()
+      DiagnosticKind::InvalidAttribute { el, attr } => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
           .with_message("invalid attribute")
           .with_code("E0000")
           .with_labels(vec![
@@ -104,35 +93,102 @@ impl compiler::DiagnosticReporter for DiagnosticPrinter {
           ])
       }
 
-      DiagnosticData::InvalidElement(name) => {
-        Diagnostic::error()
+      DiagnosticKind::InvalidElement { el } => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
           .with_message("invalid element")
           .with_code("E0000")
           .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(format!("invalid element `{}`", name)),
+            Label::primary(file_id, pos..pos).with_message(format!("invalid element `{}`", el)),
           ])
       }
 
-      DiagnosticData::InvalidContext(name, ty, parent) => {
-        Diagnostic::error()
+      DiagnosticKind::InvalidContext { el, parent } => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
           .with_message("element found in invalid context")
           .with_code("E0000")
           .with_labels(vec![
-            Label::primary(file_id, pos..pos).with_message(format!("element `{}` of type `{}` is not allowed inside `{}`", name, ty, parent)),
+            Label::primary(file_id, pos..pos).with_message(format!("element `{}` is not allowed inside `{}`", el, parent)),
           ])
+      }
+
+      DiagnosticKind::CssParseError(err) => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
+          .with_message("CSS parsing error")
+          .with_code("E0000")
+          .with_labels(vec![
+            match err.0.kind {
+              cssparser::ParseErrorKind::Basic(err) => match err {
+                cssparser::BasicParseErrorKind::UnexpectedToken(token) => {
+                  let css = token.to_css_string();
+                  let end = pos + 1 + css.len();
+                  Label::primary(file_id, pos + 1..end).with_message(format!("unexpected token `{}`", css))
+                }
+
+                cssparser::BasicParseErrorKind::EndOfInput => {
+                  Label::primary(file_id, pos..pos).with_message(format!("end of input"))
+                }
+
+                cssparser::BasicParseErrorKind::AtRuleInvalid(rule) => {
+                  let beg = pos - rule.len() - 1;
+                  Label::primary(file_id, beg..pos).with_message(format!("at-rule `{}` invalid", rule))
+                }
+
+                cssparser::BasicParseErrorKind::AtRuleBodyInvalid => {
+                  Label::primary(file_id, pos..pos).with_message(format!("at-rule body invalid"))
+                }
+
+                cssparser::BasicParseErrorKind::QualifiedRuleInvalid => {
+                  Label::primary(file_id, pos..pos).with_message(format!("qualified rule invalid"))
+                }
+              }
+
+              cssparser::ParseErrorKind::Custom(..) => unimplemented!(),
+            }
+          ])
+      }
+
+      DiagnosticKind::SassParseError(err) => {
+        let (file_id, pos) = location.unwrap();
+        codespan_diagnostic
+          .with_message("libsass error")
+          .with_code("E0000")
+          .with_labels(vec![
+            Label::primary(file_id, pos..pos).with_message(err),
+          ])
+      }
+
+      kind => {
+        if let Some((file_id, pos)) = location {
+          codespan_diagnostic
+            .with_labels(vec![
+              Label::primary(file_id, pos..pos).with_message(kind.to_string()),
+            ])
+        } else {
+          codespan_diagnostic
+            .with_message(kind.to_string())
+        }
       }
     };
 
     term::emit(&mut self.writer.lock(), &self.config, &self.files, &diagnostic).unwrap();
+  }
 
-    Ok(())
+  fn checkpoint(&mut self) -> Result<(), ()> {
+    if self.should_exit {
+      Err(())
+    } else {
+      Ok(())
+    }
   }
 }
 
 use clap::{Arg, App};
 
 fn main() {
-  let matches = App::new("My Super Program")
+  let matches = App::new(env!("CARGO_PKG_NAME"))
     .version(env!("CARGO_PKG_VERSION"))
     .author(env!("CARGO_PKG_AUTHORS"))
     .about(env!("CARGO_PKG_DESCRIPTION"))
@@ -157,8 +213,6 @@ fn main() {
       doc.save_into(f);
     },
 
-    Err(e) => {
-      printer.handle_error(e);
-    }
+    Err(..) => {}
   }
 }

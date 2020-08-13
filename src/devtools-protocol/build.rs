@@ -281,6 +281,9 @@ fn uppercase_first(s: &str) -> String {
 }
 
 fn main() {
+  println!("cargo:rerun-if-changed=devtools-protocol/json/browser_protocol.json");
+  println!("cargo:rerun-if-changed=devtools-protocol/json/js_protocol.json");
+
   let mut browser: Protocol = serde_json::from_reader(File::open("devtools-protocol/json/browser_protocol.json").unwrap()).unwrap();
   let js: Protocol = serde_json::from_reader(File::open("devtools-protocol/json/js_protocol.json").unwrap()).unwrap();
 
@@ -400,7 +403,7 @@ fn main() {
       }
 
       if let Some(ret) = command.returns {
-        let props: Vec<_> = generate_properties(&ident, &mut types, ret, false);
+        let props = generate_properties(&ident, &mut types, ret, false);
 
         command_results.push(quote!(
           #[doc = #description]

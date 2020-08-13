@@ -1,5 +1,30 @@
-$foo: baz;
+// @import "other";
 
-.foo {
-  bar: foo($foo);
+$half: 50%;
+
+:root {
+  @warn "foo";
+  width: $half;
+  height: 75%;
+  background-color: white;
+  margin-left: 150px;
+}
+
+#id {
+  width: $half;
+  height: $half;
+  background-color: black;
+  margin-left: 50px;
+}
+
+.two {
+  width: 1000px;
+  // height: 1000px;
+  height: $half;
+  margin-left: 10px;
+  background-color: rgba(0, 0, 255, 0.5);
+}
+
+bar {
+  width: 10px;
 }

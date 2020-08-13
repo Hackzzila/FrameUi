@@ -9,11 +9,13 @@ use project_a::dom;
 fn main() {
   pretty_env_logger::init();
 
-  let f = std::fs::File::open("file.cframe").unwrap();
-  let doc = dom::CompiledDocument::load_from(f);
+  // let f = std::fs::File::open("file.cframe").unwrap();
+  // let doc = dom::CompiledDocument::load_from(f);
 
 
-  let doc = Arc::new(doc);
+  // let doc = Arc::new(doc);
+
+  let doc = dom::include_document!("../file.cframe");
 
   let mut devtools = chrome_devtools::DevTools::new("127.0.0.1:4000");
   devtools.add_view(Arc::clone(&doc));
