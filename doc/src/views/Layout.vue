@@ -10,9 +10,10 @@
       <div class="pl-4 pr-12">
         <p class="text-lg font-medium">Elements</p>
         <a class="block" href="google.com">&lt;Frame&gt;</a>
-        <a class="block" href="google.com">&lt;Head&gt;</a>
-        <a class="block" href="google.com">&lt;Body&gt;</a>
-        <a class="block text-blue-500" href="google.com">&lt;Button&gt;</a>
+        <a class="ml-4 block" href="google.com">&lt;Head&gt;</a>
+        <a class="ml-8 block" href="google.com">&lt;Style&gt;</a>
+        <a class="ml-4 block" href="google.com">&lt;Body&gt;</a>
+        <a class="ml-8 block text-blue-500" href="google.com">&lt;Button&gt;</a>
       </div>
 
       <div class="flex-grow flex flex-col">

@@ -9,30 +9,71 @@ fn safe_yoga_node_new() -> yoga::Node {
   unsafe { yoga::Node::new() }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Element {
   pub data: ElementData,
+
+  pub raw_attributes: RawElementAttributes,
+
   pub classes: Vec<String>,
   pub id: Option<String>,
   pub style: Vec<style::StyleRule>,
+
   #[serde(skip, default = "safe_yoga_node_new")]
   pub yg: yoga::Node,
+
   #[serde(skip)]
   pub computed: style::ComputedStyle,
-  #[serde(skip)]
-  pub render: style::RenderStyle,
+}
+
+impl PartialEq for Element {
+  fn eq(&self, other: &Self) -> bool {
+    // The yoga pointer for each element SHOULD be unique...
+    self.yg == other.yg
+  }
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum RawAttributeValue {
+  Raw {
+    value: String,
+
+    #[serde(skip)]
+    up_to_date: bool,
+  },
+
+  Script {
+    script: String,
+
+    #[serde(skip)]
+    up_to_date: bool,
+
+    #[serde(skip)]
+    ast: Option<rhai::AST>,
+  },
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct RawElementAttributes {
+  pub class: Option<RawAttributeValue>,
+  pub id: Option<RawAttributeValue>,
+  pub style: Option<RawAttributeValue>,
 }
 
 impl Element {
-  pub fn new(data: ElementData) -> Self {
+  #[must_use]
+  pub fn new(data: ElementData, attrs: RawElementAttributes) -> Self {
     Self {
       data,
+
+      raw_attributes: attrs,
       classes: Vec::new(),
       id: None,
       style: Vec::new(),
+
       yg: unsafe { yoga::Node::new() },
-      computed: Default::default(),
-      render: Default::default(),
+      computed: style::ComputedStyle::default(),
     }
   }
 
@@ -47,16 +88,68 @@ impl Element {
     }
   }
 
-  pub fn update_render(&mut self) {
-    unsafe {
-      self.render.width = self.yg.get_width();
-      self.render.height = self.yg.get_height();
-      self.render.top = self.yg.get_top();
-      self.render.left = self.yg.get_left();
-      self.render.background_color = self.computed.background_color;
+  pub fn compute_attributes(&mut self, engine: &rhai::Engine, scope: &mut rhai::Scope) {
+    if let Some(class) = &mut self.raw_attributes.class {
+      match class {
+        RawAttributeValue::Raw { value, up_to_date } => {
+          if !*up_to_date {
+            self.classes = value.split_ascii_whitespace().map(|s| s.to_string()).collect()
+          }
+        },
+
+        RawAttributeValue::Script { script, up_to_date, ast } => {
+          if ast.is_none() || !*up_to_date {
+            *ast = Some(engine.compile_expression_with_scope(scope, script).unwrap());
+            *up_to_date = true;
+          }
+
+          let dynamic_classes: Vec<rhai::Dynamic> = engine.eval_ast_with_scope(scope, ast.as_ref().unwrap()).unwrap();
+          self.classes.clear();
+          for class in dynamic_classes {
+            self.classes.push(class.take_string().unwrap());
+          }
+        }
+      }
+    } else {
+      self.classes.clear();
+    }
+
+    if let Some(id) = &mut self.raw_attributes.id {
+      match id {
+        RawAttributeValue::Raw { value, up_to_date } => {
+          if !*up_to_date {
+            self.id = Some(value.clone());
+          }
+        },
+
+        RawAttributeValue::Script { script, up_to_date, ast } => {
+          if ast.is_none() || !*up_to_date {
+            *ast = Some(engine.compile_expression_with_scope(scope, script).unwrap());
+            *up_to_date = true;
+          }
+
+          self.id = Some(engine.eval_ast_with_scope(scope, ast.as_ref().unwrap()).unwrap());
+        }
+      }
+    } else {
+      self.id = None;
     }
   }
 
+  #[must_use]
+  pub fn get_render(&self) -> style::RenderStyle {
+    unsafe {
+      style::RenderStyle {
+        width: self.yg.get_width(),
+        height: self.yg.get_height(),
+        top: self.yg.get_top(),
+        left: self.yg.get_left(),
+        background_color: self.computed.background_color,
+      }
+    }
+  }
+
+  #[must_use]
   pub fn get_local_name(&self) -> &str {
     match self.data {
       ElementData::Root(..) => "#root",
@@ -64,6 +157,7 @@ impl Element {
     }
   }
 
+  #[must_use]
   pub fn get_namespace(&self) -> Option<&str> {
     None
   }
@@ -78,6 +172,9 @@ pub enum ElementData {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RootElement;
 
+///
+///
+///
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnstyledElement;
 
@@ -87,11 +184,27 @@ pub struct CompiledDocument {
   pub elements: RwLock<Arena<Element>>,
   pub root: NodeId,
   pub stylesheet: style::StyleSheet,
+
+  #[serde(skip)]
+  pub engine: rhai::Engine,
+  #[serde(skip)]
+  pub scope: RwLock<rhai::Scope<'static>>,
 }
 
 use std::io::prelude::*;
 
 impl CompiledDocument {
+  pub fn new(elements: Arena<Element>, root: NodeId, stylesheet: style::StyleSheet) -> Self {
+    Self {
+      version: STRUCTURE_VERSION,
+      elements: RwLock::new(elements),
+      root,
+      stylesheet,
+      engine: rhai::Engine::default(),
+      scope: RwLock::new(rhai::Scope::default()),
+    }
+  }
+
   pub fn save(&self) -> Vec<u8> {
     bincode::serialize(self).unwrap()
   }
@@ -100,10 +213,12 @@ impl CompiledDocument {
     bincode::serialize_into(writer, self).unwrap();
   }
 
+  #[must_use]
   pub fn load(data: &[u8]) -> Self {
     Self::load_from(data)
   }
 
+  #[must_use]
   pub fn load_from<R: Read>(reader: R) -> Self {
     let doc: CompiledDocument = bincode::deserialize_from(reader).unwrap();
     doc.init_yoga();
@@ -119,7 +234,7 @@ impl CompiledDocument {
       let node = &arena[node];
       let parent = arena[node.parent().unwrap()].get();
       unsafe {
-        parent.yg.insert_child(&node.get().yg, parent.yg.child_count());
+        parent.yg.insert_child(*node.get().yg, parent.yg.child_count());
       }
     }
   }
@@ -128,6 +243,8 @@ impl CompiledDocument {
     let mut arena = self.elements.write().unwrap();
     let vec: Vec<_> = self.root.descendants(&arena).collect();
     for id in &vec {
+      arena[*id].get_mut().compute_attributes(&self.engine, &mut self.scope.write().unwrap());
+
       let node = &arena[*id];
 
       let mut computed = node.get().computed;
@@ -139,18 +256,14 @@ impl CompiledDocument {
 
       self.stylesheet.apply(&element, &mut computed);
 
-      let node = arena[*id].get_mut();
-      node.computed = computed;
-      node.prepare_yoga();
+      let el = arena[*id].get_mut();
+      el.computed = computed;
+      el.prepare_yoga();
     }
 
     let root = arena[self.root].get_mut();
     unsafe {
       root.yg.calculate_layout(width, height, direction);
-    }
-
-    for id in vec {
-      arena[id].get_mut().update_render();
     }
   }
 
@@ -261,11 +374,11 @@ impl<'a> selectors::Element for MatchingElement<'a> {
     false
   }
 
-  fn has_local_name(&self, local_name: &String) -> bool {
+  fn has_local_name(&self, local_name: &str) -> bool {
     self.node.get().get_local_name() == local_name
   }
 
-  fn has_namespace(&self, ns: &String) -> bool {
+  fn has_namespace(&self, ns: &str) -> bool {
     self.node.get().get_namespace().map_or(false, |node_ns| node_ns == ns)
   }
 

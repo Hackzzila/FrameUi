@@ -61,14 +61,17 @@ pub struct StyleSheet {
 }
 
 impl StyleSheet {
+  #[must_use]
   pub fn new() -> Self {
     Self { rules: Vec::new() }
   }
 
+  #[must_use]
   pub fn create_parser_input(input: &str) -> ParserInput<'_> {
     cssparser::ParserInput::new(input)
   }
 
+  #[must_use]
   pub fn create_parser_input_with_line_offset(input: &str, offset: u32) -> ParserInput<'_> {
     cssparser::ParserInput::new_with_line_number_offset(input, offset)
   }

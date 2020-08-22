@@ -4,7 +4,6 @@ use std::{
   io,
   io::{prelude::*, BufReader},
   path::Path,
-  sync::RwLock,
 };
 
 use indextree::{Arena, NodeId};
@@ -12,7 +11,7 @@ use quick_xml::events::{BytesStart, Event};
 use reqwest::blocking::{get, Response};
 use url::Url;
 
-use dom::{CompiledDocument, Element, ElementData, RootElement, UnstyledElement, STRUCTURE_VERSION};
+use dom::{CompiledDocument, Element, ElementData, RootElement, UnstyledElement};
 use style::StyleSheet;
 
 #[path = "style.rs"]
@@ -524,7 +523,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
       .decode(&name)
       .map_err(handle_error_with_location!(self, file_id, reader))?;
 
-    let mut el = Element::new(ElementData::Unstyled(UnstyledElement));
+    let  mut raw_attributes = dom::RawElementAttributes::default();
     for attr in e.attributes() {
       let attr = attr.map_err(handle_error_with_location!(self, file_id, reader))?;
       let key = reader
@@ -539,11 +538,33 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
 
       match key {
         "class" => {
-          el.classes = value.split_ascii_whitespace().map(|s| s.to_string()).collect();
+          raw_attributes.class = Some(dom::RawAttributeValue::Raw {
+            value: value.to_string(),
+            up_to_date: false,
+          });
+        }
+
+        ":class" => {
+          raw_attributes.class = Some(dom::RawAttributeValue::Script {
+            script: value.to_string(),
+            up_to_date: false,
+            ast: None,
+          });
         }
 
         "id" => {
-          el.id = Some(value.to_string());
+          raw_attributes.id = Some(dom::RawAttributeValue::Raw {
+            value: value.to_string(),
+            up_to_date: false,
+          });
+        }
+
+        ":id" => {
+          raw_attributes.id = Some(dom::RawAttributeValue::Script {
+            script: value.to_string(),
+            up_to_date: false,
+            ast: None,
+          });
         }
 
         "style" => {
@@ -563,6 +584,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
       }
     }
 
+    let el = Element::new(ElementData::Unstyled(UnstyledElement), raw_attributes);
     let node = self.body.new_node(el);
     parent.append(node, &mut self.body);
 
@@ -589,7 +611,7 @@ pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(
   let mut buf = Vec::new();
 
   let mut elements = Arena::new();
-  let root = elements.new_node(Element::new(ElementData::Root(RootElement)));
+  let root = elements.new_node(Element::new(ElementData::Root(RootElement), dom::RawElementAttributes::default()));
 
   let mut ctx = Context {
     body: elements,
@@ -602,13 +624,7 @@ pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(
 
   ctx.reporter.checkpoint()?;
 
-  let doc = CompiledDocument {
-    version: STRUCTURE_VERSION,
-    elements: RwLock::new(ctx.body),
-    stylesheet: ctx.stylesheet,
-    root,
-  };
-
+  let doc = CompiledDocument::new(ctx.body, ctx.root, ctx.stylesheet);
   doc.init_yoga();
 
   Ok(doc)

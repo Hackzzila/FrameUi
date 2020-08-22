@@ -12,7 +12,7 @@
     <hr class="border-gray-300 border-t-2 my-8">
 
     <div v-for="member in data.methods" v-bind:key="member.name" :id="member.name" class="mb-12">
-      <pre class="bg-gray-200 rounded-lg px-4 py-3 mb-4"><code>{{member.declaration}}</code></pre>
+      <CodeBlock :current="current" :languages="languages" :item="data.name" :text="member.declaration" />
       <div class="ml-1 pl-2 border-l-2 border-gray-300">
         <pre class="font-sans">{{member.description}}</pre>
       </div>
@@ -21,10 +21,11 @@
 </template>
 
 <script>
+import CodeBlock from './CodeBlock.vue';
+
 export default {
   name: 'StructView',
-  props: {
-    data: Object,
-  },
+  props: ['current', 'languages', 'data'],
+  components: { CodeBlock },
 };
 </script>

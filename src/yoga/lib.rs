@@ -2,6 +2,9 @@ pub mod sys {
   #![allow(non_upper_case_globals)]
   #![allow(non_camel_case_types)]
   #![allow(non_snake_case)]
+  #![allow(clippy::all)]
+  #![allow(clippy::pedantic)]
+  #![allow(clippy::caego)]
 
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -9,6 +12,8 @@ pub mod sys {
 use serde::{Deserialize, Serialize};
 use std::{ffi::CStr, fmt, ops::Deref};
 
+#[allow(clippy::useless_attribute)]
+#[allow(clippy::wildcard_imports)]
 use sys::*;
 
 macro_rules! yg_enum {
@@ -73,6 +78,7 @@ pub struct Node {
 }
 
 impl Node {
+  #[must_use]
   pub unsafe fn new() -> Self {
     Self { inner: YGNodeNew() }
   }
@@ -89,10 +95,12 @@ impl Node {
     YGNodePrint(**self, std::mem::transmute(options.bits()));
   }
 
+  #[must_use]
   pub unsafe fn child_count(&self) -> u32 {
     YGNodeGetChildCount(**self)
   }
 
+  #[must_use]
   pub unsafe fn get_child(&self, index: u32) -> Self {
     Self {
       inner: YGNodeGetChild(**self, index),
@@ -100,8 +108,8 @@ impl Node {
   }
 
   // This should take &mut self, but that causes borrow issues when initializing dom...
-  pub unsafe fn insert_child(&self, child: &YGNodeRef, index: u32) {
-    YGNodeInsertChild(**self, *child, index);
+  pub unsafe fn insert_child(&self, child: YGNodeRef, index: u32) {
+    YGNodeInsertChild(**self, child, index);
   }
 
   pub unsafe fn set_width(&mut self, width: Value) {
@@ -156,18 +164,22 @@ impl Node {
     YGNodeCalculateLayout(**self, available_width, available_height, owner_direction);
   }
 
+  #[must_use]
   pub unsafe fn get_top(&self) -> f32 {
     YGNodeLayoutGetTop(**self)
   }
 
+  #[must_use]
   pub unsafe fn get_left(&self) -> f32 {
     YGNodeLayoutGetLeft(**self)
   }
 
+  #[must_use]
   pub unsafe fn get_width(&self) -> f32 {
     YGNodeLayoutGetWidth(**self)
   }
 
+  #[must_use]
   pub unsafe fn get_height(&self) -> f32 {
     YGNodeLayoutGetHeight(**self)
   }

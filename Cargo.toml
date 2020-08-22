@@ -11,7 +11,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 
 [[bin]]
 name = "project-a"
-required-features = ["r-winit-adapter", "r-compiler", "r-chrome_devtools"]
+required-features = ["r-winit-adapter", "r-compiler", "r-dom"]
 
 [workspace]
 members = [
@@ -22,7 +22,6 @@ members = [
   "src/event",
   "src/render",
   "src/sass",
-  "src/spec",
   "src/style",
   "src/winit-adapter",
   "src/yoga",

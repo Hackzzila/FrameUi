@@ -17,8 +17,8 @@ impl selectors::SelectorImpl for SelectorImpl {
   type PartName = String;
   type NamespacePrefix = String;
   type NamespaceUrl = String;
-  type BorrowedNamespaceUrl = String;
-  type BorrowedLocalName = String;
+  type BorrowedNamespaceUrl = str;
+  type BorrowedLocalName = str;
 
   type NonTSPseudoClass = PseudoClass;
   type PseudoElement = PseudoElement;
@@ -52,20 +52,7 @@ impl cssparser::ToCss for PseudoClass {
   where
     W: fmt::Write,
   {
-    // Ok(())
     match *self {}
-    // dest.write_str(match *self {
-    //     PseudoClass::AnyLink => ":any-link",
-    //     PseudoClass::Link => ":link",
-    //     PseudoClass::Visited => ":visited",
-    //     PseudoClass::Active => ":active",
-    //     PseudoClass::Focus => ":focus",
-    //     PseudoClass::Hover => ":hover",
-    //     PseudoClass::Enabled => ":enabled",
-    //     PseudoClass::Disabled => ":disabled",
-    //     PseudoClass::Checked => ":checked",
-    //     PseudoClass::Indeterminate => ":indeterminate",
-    // })
   }
 }
 

@@ -6,9 +6,36 @@
       </div>
     </div>
 
+    <div class="bg-gray-900 text-white py-2">
+      <div class="container mx-auto flex justify-center">
+        <div class="flex-1 text-center">
+          <p class="text-gray-100" style="font-family: 'Montserrat', sans-serif;">Frame<span class="text-blue-500">Ui</span></p>
+          <p class="text-sm text-gray-100">v0.1.0</p>
+        </div>
+
+        <div class="border-r border-gray-700 mx-8"></div>
+
+        <!-- <p class="text-gray-100 flex-1 text-center" style="font-family: 'Montserrat', sans-serif;">Frame<span class="text-blue-500">Ui</span> <span class="font-thin">Embedded</span></p> -->
+
+        <div class="flex-1 text-center">
+          <p class="text-gray-100" style="font-family: 'Montserrat', sans-serif;">Frame<span class="text-blue-500">Ui</span> <span class="font-thin">Embedded</span></p>
+          <p class="text-sm text-gray-100">Planned</p>
+        </div>
+
+        <div class="border-r border-gray-700 mx-8"></div>
+
+        <!-- <p class="text-gray-100 flex-1 text-center" style="font-family: 'Montserrat', sans-serif;">Frame<span class="text-blue-500">Ui</span> <span class="font-thin">Web</span></p> -->
+
+        <div class="flex-1 text-center">
+          <p class="text-gray-100" style="font-family: 'Montserrat', sans-serif;">Frame<span class="text-blue-500">Ui</span> <span class="font-thin">Web</span></p>
+          <p class="text-sm text-gray-100">Planned</p>
+        </div>
+      </div>
+    </div>
+
     <div class="container mx-auto mt-12 grid grid-cols-2">
       <div class="m-auto text-center">
-        <p class="text-3xl font-inter font-medium">Write HTML-like layouts</p>
+        <p class="text-3xl font-inter font-medium">Write layouts in XML</p>
         <p>Using a syntax familiar to HTML</p>
       </div>
 

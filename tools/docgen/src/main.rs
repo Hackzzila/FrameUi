@@ -12,7 +12,7 @@ fn parse_comment(comment: String) -> (String, HashMap<String, Option<String>>) {
       description += "\n";
     } else if line == "/" {
       continue;
-    } else if line.starts_with(" ") {
+    } else if line.starts_with(' ') {
       description += line;
       description += "\n";
     } else {
@@ -49,12 +49,6 @@ fn main() {
     .collect::<Vec<_>>();
 
   for e in structs {
-    // println!("{:?} {:?} {:?}", e.get_display_name(), e.get_type(), e.get_typedef_underlying_type());
-
-    // println!("{:?}", e.get_type().unwrap());
-    // println!("{:?}", e.get_type().unwrap().get_canonical_type());
-    // println!("{:?}", e.get_type().unwrap().get_elaborated_type());
-
     let (_, config) = parse_comment(e.get_comment().unwrap_or_default());
     if let Some(module) = config.get("module") {
       let module = module.clone().unwrap();
@@ -66,22 +60,31 @@ fn main() {
 
       let name = e.get_name().unwrap();
 
-      // println!("{:?}", e.get_type().unwrap());
-      // println!("{:?}", e.get_type().unwrap().get_canonical_type());
-
-      // panic!();
-
       match e.get_type().unwrap().get_canonical_type().get_kind() {
         TypeKind::Record => {
-          entry.children.insert(
-            name.clone(),
-            c::Definition::Struct(c::Struct {
-              name,
-              module,
-              methods: BTreeMap::new(),
-              entity: e,
-            }),
-          );
+          let fields = e.get_type().unwrap().get_canonical_type().get_fields().unwrap();
+
+          if !fields.is_empty() {
+            entry.children.insert(
+              name.clone(),
+              c::Definition::DataStruct(c::DataStruct {
+                name,
+                module,
+                entity: e,
+                fields: fields.into_iter().map(|x| c::Field { entity: x }).collect(),
+              }),
+            );
+          } else {
+            entry.children.insert(
+              name.clone(),
+              c::Definition::Struct(c::Struct {
+                name,
+                module,
+                methods: BTreeMap::new(),
+                entity: e,
+              }),
+            );
+          }
         }
 
         _ => {
@@ -100,13 +103,11 @@ fn main() {
     .filter(|e| e.get_kind() == EntityKind::FunctionDecl && !e.is_in_system_header())
     .collect::<Vec<_>>();
 
-  // println!("{:#?}", modules);
-
   for e in fns {
     let (_, config) = parse_comment(e.get_comment().unwrap_or_default());
     if let Some(module) = config.get("module") {
       let name = e.get_name().unwrap();
-      let is_struct = name.chars().nth(0).unwrap().is_ascii_uppercase();
+      let is_struct = name.chars().next().unwrap().is_ascii_uppercase();
 
       if is_struct {
         let mut iter = name.splitn(2, "_");
@@ -133,28 +134,27 @@ fn main() {
     }
   }
 
-  {
-    let cxx: Vec<_> = modules.iter().map(|(_, x)| x.to_cxx()).collect();
+  // {
+  //   let cxx: Vec<_> = modules.iter().map(|(_, x)| x.to_cxx()).collect();
 
-    let mut f = std::fs::File::create("./include/project-a.hpp").unwrap();
-    f.write(
-      b"
-    #include <cassert>
+  //   let mut f = std::fs::File::create("./include/project-a.hpp").unwrap();
+  //   f.write_all(
+  //     b"#include <cassert>
 
-    namespace frameui {
+  //     namespace frameui {
 
-    namespace c_api {
-      #include \"project-a.h\"
-    }",
-    )
-    .unwrap();
+  //     namespace c_api {
+  //       #include \"project-a.h\"
+  //     }",
+  //   )
+  //   .unwrap();
 
-    for module in cxx {
-      f.write(module.as_bytes()).unwrap();
-    }
+  //   for module in cxx {
+  //     f.write_all(module.as_bytes()).unwrap();
+  //   }
 
-    f.write(b"}").unwrap();
-  }
+  //   f.write_all(b"}").unwrap();
+  // }
 
   let _ = std::process::Command::new("clang-format")
     .args(&["--style=google", "-i", "include/project-a.hpp"])
@@ -166,6 +166,7 @@ fn main() {
   let mut keywords = HashMap::new();
   keywords.insert("Struct".to_string(), "struct".to_string());
   keywords.insert("Typedef".to_string(), "typedef".to_string());
+  keywords.insert("DataStruct".to_string(), "struct".to_string());
 
   let root = doc::Root {
     language: "C".to_string(),

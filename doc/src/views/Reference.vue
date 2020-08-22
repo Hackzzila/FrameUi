@@ -1,14 +1,27 @@
 <template>
   <div>
-    <div class="bg-gray-800 text-white py-2">
+    <div class="bg-gray-900 text-white py-2">
       <div class="container mx-auto flex justify-between">
-        <p class="text-2xl text-gray-100" style="font-family: 'Montserrat', sans-serif;">Frame<span class="text-blue-500">Ui</span> <span class="font-thin">Docs</span></p>
+        <p class="text-lg text-gray-100">Documentation</p>
 
-        <select class="bg-transparent border border-gray-600 rounded-md w-20 my-1" v-model="current">
-          <option class="text-black" v-for="(language, idx) in languages" v-bind:key="idx" :value="idx">{{language.language}}</option>
-        </select>
+        <div class="flex">
+          <div class="mr-4">
+            <span class="mr-1 text-sm text-gray-500">Version:</span>
+            <select class="bg-transparent text-sm pr-1" v-model="current">
+              <option class="text-black" v-for="(language, idx) in languages" v-bind:key="idx" :value="idx">master</option>
+            </select>
+          </div>
+
+          <div>
+            <span class="mr-1 text-sm text-gray-500">Language:</span>
+            <select class="bg-transparent text-sm pr-1" v-model="current">
+              <option class="text-black" v-for="(language, idx) in languages" v-bind:key="idx" :value="idx">{{language.language}}</option>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
+
     <div class="container mx-auto mt-6">
       <router-view :current="current" :languages="languages" />
     </div>

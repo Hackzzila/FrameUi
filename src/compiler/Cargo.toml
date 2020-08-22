@@ -21,7 +21,6 @@ quick-xml = "0.18"
 reqwest = { version = "0.10.6", features = ["blocking"] }
 url = "2.1.1"
 style = { path = "../style" }
-spec = { path = "../spec" }
 yoga = { path = "../yoga" }
 sass = { path = "../sass" }
 codespan-reporting = "0.9.5"

@@ -4,7 +4,9 @@
     <div class="ml-1 pl-2 border-l-2 border-gray-300">
       {{data.brief}}
     </div>
-    <StructView :data="data" v-if="data.type == 'Struct'"/>
+
+    <StructView :languages="languages" :current="current" :data="data" v-if="data.type == 'Struct'"/>
+    <DataStructView :data="data" v-if="data.type == 'DataStruct'"/>
     <TypedefView :data="data" v-if="data.type == 'Typedef'"/>
   </div>
 </template>
@@ -12,6 +14,7 @@
 <script>
 // @ is an alias to /src
 import StructView from '@/components/StructView.vue';
+import DataStructView from '@/components/DataStructView.vue';
 import TypedefView from '@/components/TypedefView.vue';
 
 export default {
@@ -19,6 +22,7 @@ export default {
   props: ['current', 'languages', 'mod', 'item'],
   components: {
     StructView,
+    DataStructView,
     TypedefView,
   },
   data() {

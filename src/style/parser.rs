@@ -10,7 +10,7 @@ fn parse_yoga_value<'i, 't>(
     Ok(yoga::Value::Undefined)
   } else if input.try_parse(|input| input.expect_ident_matching("auto")).is_ok() {
     Ok(yoga::Value::Auto)
-  } else if let Ok(percent) = input.try_parse(|input| input.expect_percentage()) {
+  } else if let Ok(percent) = input.try_parse(cssparser::Parser::expect_percentage) {
     Ok(yoga::Value::Percent(percent * 100.0))
   } else {
     let start_location = input.current_source_location();
@@ -24,10 +24,10 @@ fn parse_yoga_value<'i, 't>(
 
 impl Declaration {
   pub fn parse<'i, 't>(
-    name: cssparser::CowRcStr<'i>,
+    name: &cssparser::CowRcStr<'i>,
     input: &mut cssparser::Parser<'i, 't>,
   ) -> Result<Self, cssparser::BasicParseError<'i>> {
-    match &*name {
+    match &**name {
       "width" => Ok(Self::Width(parse_yoga_value(input)?)),
       "height" => Ok(Self::Height(parse_yoga_value(input)?)),
       "background-color" => {
@@ -66,7 +66,7 @@ impl<'i> cssparser::DeclarationParser<'i> for DeclarationParser {
     name: cssparser::CowRcStr<'i>,
     input: &mut cssparser::Parser<'i, 't>,
   ) -> Result<Self::Declaration, cssparser::ParseError<'i, Self::Error>> {
-    Ok(Declaration::parse(name, input)?)
+    Ok(Declaration::parse(&name, input)?)
   }
 }
 

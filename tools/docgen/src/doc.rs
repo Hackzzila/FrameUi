@@ -19,6 +19,7 @@ pub struct Module {
 pub enum Definition {
   Typedef(Typedef),
   Struct(Struct),
+  DataStruct(DataStruct),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -39,6 +40,22 @@ pub struct Struct {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Method {
+  pub name: String,
+  pub declaration: String,
+  pub brief: Option<String>,
+  pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DataStruct {
+  pub name: String,
+  pub brief: Option<String>,
+  pub description: Option<String>,
+  pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Field {
   pub name: String,
   pub declaration: String,
   pub brief: Option<String>,

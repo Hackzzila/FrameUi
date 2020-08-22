@@ -13,7 +13,7 @@ fn uppercase_first(s: &str) -> String {
 }
 
 pub fn to_pascal_case(s: &str) -> String {
-  s.split("_").map(|x| uppercase_first(x)).collect::<String>()
+  s.split('_').map(|x| uppercase_first(x)).collect::<String>()
 }
 
 impl Module<'_> {
@@ -41,6 +41,7 @@ impl Definition<'_> {
     match self {
       Self::Struct(s) => s.to_cxx(),
       Self::Typedef(s) => s.to_cxx(),
+      Self::DataStruct(s) => unimplemented!(),
     }
   }
 }

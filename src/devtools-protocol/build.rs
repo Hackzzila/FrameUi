@@ -187,24 +187,9 @@ fn ref_to_type(reference: &RefType, current_domain: &str, domains: &[ProtocolDom
     DomainTypeData::Object(..) if !in_vec => quote!(Box<super::#ns::#ident>),
     _ => quote!(super::#ns::#ident),
   }
-
-  // panic!("{:#?}", ty);
-
-  // if name.contains('.') {
-  //   let mut split = name.split('.');
-  //   let ns = split.next().unwrap();
-  //   let name = split.next().unwrap();
-
-  //   let ns = format_ident!("{}", ns.to_lowercase());
-  //   let ident = format_ident!("{}", name);
-  //   quote!(Box<super::#ns::#ident>)
-  // } else {
-  //   let ident = format_ident!("{}", name);
-  //   quote!(Box<#ident>)
-  // }
 }
 
-fn generate_enum(ident: &Ident, description: String, variants: &[String]) -> TokenStream {
+fn generate_enum(ident: &Ident, description: &str, variants: &[String]) -> TokenStream {
   let variants = variants.iter().map(|x| {
     if x.contains('-') {
       let ident = format_ident!("r#{}", x.replace("-", "_"));
@@ -240,11 +225,6 @@ fn generate_properties(
     .map(|prop| {
       let ty = match &prop.data {
         RefTypeOr::Ref(reference) => {
-          // if reference.r#ref == ident.to_string() {
-          //   quote!(Box<Self>)
-          // } else {
-          //   ref_to_type(reference)
-          // }
           ref_to_type(&reference, domain, domains, false)
         }
 
@@ -258,7 +238,7 @@ fn generate_properties(
               let ident = format_ident!("{}{}", ident, uppercase_first(&prop.name));
               types.push(generate_enum(
                 &ident,
-                prop.description.clone().unwrap_or_default(),
+                &prop.description.clone().unwrap_or_default(),
                 &variants,
               ));
               quote!(#ident)
@@ -360,7 +340,7 @@ fn main() {
 
         DomainTypeData::String(s) => {
           if let Some(variants) = s.r#enum {
-            types.push(generate_enum(&ident, description, &variants));
+            types.push(generate_enum(&ident, &description, &variants));
           } else {
             types.push(quote!(
               #[doc = #description]

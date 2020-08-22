@@ -2,6 +2,9 @@ pub mod sys {
   #![allow(non_upper_case_globals)]
   #![allow(non_camel_case_types)]
   #![allow(non_snake_case)]
+  #![allow(clippy::all)]
+  #![allow(clippy::pedantic)]
+  #![allow(clippy::caego)]
 
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -30,7 +33,8 @@ impl FileContext {
     }
   }
 
-  pub fn options<'ctx>(&'ctx self) -> Options<'ctx> {
+  #[must_use]
+  pub fn options(&self) -> Options<'_> {
     unsafe {
       Options {
         opts: sys::sass_context_get_options(self.ctx),
@@ -39,7 +43,7 @@ impl FileContext {
     }
   }
 
-  pub fn compile<'ctx>(&'ctx self) -> Result<Compiled<'ctx>, Error<'ctx>> {
+  pub fn compile(&self) -> Result<Compiled<'_>, Error<'_>> {
     unsafe {
       let status = sys::sass_compile_file_context(self.file_ctx);
 
@@ -84,7 +88,8 @@ impl DataContext {
     }
   }
 
-  pub fn options<'ctx>(&'ctx self) -> Options<'ctx> {
+  #[must_use]
+  pub fn options(&self) -> Options<'_> {
     unsafe {
       Options {
         opts: sys::sass_context_get_options(self.ctx),
@@ -93,7 +98,7 @@ impl DataContext {
     }
   }
 
-  pub fn compile<'ctx>(&'ctx self) -> Result<Compiled<'ctx>, Error<'ctx>> {
+  pub fn compile(&self) -> Result<Compiled<'_>, Error<'_>> {
     unsafe {
       let status = sys::sass_compile_data_context(self.data_ctx);
 
@@ -163,6 +168,7 @@ pub struct Compiled<'ctx> {
 }
 
 impl Compiled<'_> {
+  #[must_use]
   pub fn status(&self) -> i32 {
     unsafe { sys::sass_context_get_error_status(self.ctx) }
   }
@@ -187,6 +193,7 @@ pub struct Error<'ctx> {
 }
 
 impl Error<'_> {
+  #[must_use]
   pub fn status(&self) -> i32 {
     unsafe { sys::sass_context_get_error_status(self.ctx) }
   }
@@ -226,10 +233,12 @@ impl Error<'_> {
     }
   }
 
+  #[must_use]
   pub fn line(&self) -> u64 {
     unsafe { sys::sass_context_get_error_line(self.ctx) }
   }
 
+  #[must_use]
   pub fn column(&self) -> u64 {
     unsafe { sys::sass_context_get_error_column(self.ctx) }
   }

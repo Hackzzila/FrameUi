@@ -11,7 +11,7 @@ impl bindgen::callbacks::ParseCallbacks for BindgenCallbacks {
     _: bindgen::callbacks::EnumVariantValue,
   ) -> Option<String> {
     let enum_name = enum_name?.trim_start_matches("enum").trim();
-    name.strip_prefix(enum_name).map(|x| x.to_string())
+    name.strip_prefix(enum_name).map(ToString::to_string)
   }
 
   fn include_file(&self, filename: &str) {

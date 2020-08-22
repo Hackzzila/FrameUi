@@ -16,6 +16,8 @@ fn main() {
 
   let doc = dom::include_document!("../file.cframe");
 
+  doc.scope.write().unwrap().push("id", "id".to_string());
+
   let mut devtools = chrome_devtools::DevTools::new("127.0.0.1:4000");
   devtools.add_view(Arc::clone(&doc));
 

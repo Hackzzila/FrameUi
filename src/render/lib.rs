@@ -203,21 +203,21 @@ impl Renderer {
     doc.compute_style(self.layout_size.width, self.layout_size.height, yoga::Direction::LTR);
     let arena = doc.elements.write().unwrap();
     for id in doc.root.descendants(&arena) {
-      let node = arena[id].get();
+      let computed = arena[id].get().get_render();
 
       let rect = LayoutRect::new(
-        LayoutPoint::new(node.render.left, node.render.top),
-        LayoutSize::new(node.render.width, node.render.height),
+        LayoutPoint::new(computed.left, computed.top),
+        LayoutSize::new(computed.width, computed.height),
       );
 
       builder.push_rect(
         &CommonItemProperties::new(rect, root_space_and_clip),
         rect,
         ColorF::new(
-          node.render.background_color.0 as f32 / 255.0,
-          node.render.background_color.1 as f32 / 255.0,
-          node.render.background_color.2 as f32 / 255.0,
-          node.render.background_color.3 as f32 / 255.0,
+          computed.background_color.0 as f32 / 255.0,
+          computed.background_color.1 as f32 / 255.0,
+          computed.background_color.2 as f32 / 255.0,
+          computed.background_color.3 as f32 / 255.0,
         ),
       );
     }
