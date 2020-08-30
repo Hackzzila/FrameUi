@@ -3,7 +3,12 @@ use std::sync::RwLock;
 use indextree::{Arena, Node, NodeId};
 use serde::{Deserialize, Serialize};
 
-pub const STRUCTURE_VERSION: u8 = 0;
+//                               [F]rame
+//                                     [U]
+//                                           [i]
+//                                                 [S]tandard
+//                                                       Version
+pub const MAGIC_BYTES: &[u8] = &[0x46, 0x55, 0x69, 0x53, 0];
 
 fn safe_yoga_node_new() -> yoga::Node {
   unsafe { yoga::Node::new() }
@@ -172,15 +177,11 @@ pub enum ElementData {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RootElement;
 
-///
-///
-///
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnstyledElement;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompiledDocument {
-  pub version: u8,
   pub elements: RwLock<Arena<Element>>,
   pub root: NodeId,
   pub stylesheet: style::StyleSheet,
@@ -196,7 +197,6 @@ use std::io::prelude::*;
 impl CompiledDocument {
   pub fn new(elements: Arena<Element>, root: NodeId, stylesheet: style::StyleSheet) -> Self {
     Self {
-      version: STRUCTURE_VERSION,
       elements: RwLock::new(elements),
       root,
       stylesheet,
@@ -205,11 +205,15 @@ impl CompiledDocument {
     }
   }
 
+  #[must_use]
   pub fn save(&self) -> Vec<u8> {
-    bincode::serialize(self).unwrap()
+    let mut buf = Vec::with_capacity(bincode::serialized_size(self).unwrap() as usize + MAGIC_BYTES.len());
+    self.save_into(&mut buf);
+    buf
   }
 
-  pub fn save_into<W: Write>(&self, writer: W) {
+  pub fn save_into<W: Write>(&self, mut writer: W) {
+    writer.write_all(MAGIC_BYTES).unwrap();
     bincode::serialize_into(writer, self).unwrap();
   }
 
@@ -219,7 +223,15 @@ impl CompiledDocument {
   }
 
   #[must_use]
-  pub fn load_from<R: Read>(reader: R) -> Self {
+  pub fn load_from<R: Read>(mut reader: R) -> Self {
+    // Switch to slice once const fns are stable
+    let mut magic_bytes = vec![0; MAGIC_BYTES.len()];
+    reader.read_exact(&mut magic_bytes).unwrap();
+
+    if magic_bytes != MAGIC_BYTES {
+      panic!("magic bytes don't match {:?} == {:?}", magic_bytes, MAGIC_BYTES);
+    }
+
     let doc: CompiledDocument = bincode::deserialize_from(reader).unwrap();
     doc.init_yoga();
     doc
