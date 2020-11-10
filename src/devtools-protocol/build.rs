@@ -224,9 +224,7 @@ fn generate_properties(
     .iter()
     .map(|prop| {
       let ty = match &prop.data {
-        RefTypeOr::Ref(reference) => {
-          ref_to_type(&reference, domain, domains, false)
-        }
+        RefTypeOr::Ref(reference) => ref_to_type(&reference, domain, domains, false),
 
         RefTypeOr::Other(other) => match other {
           ProtocolType::Number => quote!(f64),

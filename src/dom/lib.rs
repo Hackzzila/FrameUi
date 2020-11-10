@@ -100,9 +100,13 @@ impl Element {
           if !*up_to_date {
             self.classes = value.split_ascii_whitespace().map(|s| s.to_string()).collect()
           }
-        },
+        }
 
-        RawAttributeValue::Script { script, up_to_date, ast } => {
+        RawAttributeValue::Script {
+          script,
+          up_to_date,
+          ast,
+        } => {
           if ast.is_none() || !*up_to_date {
             *ast = Some(engine.compile_expression_with_scope(scope, script).unwrap());
             *up_to_date = true;
@@ -125,9 +129,13 @@ impl Element {
           if !*up_to_date {
             self.id = Some(value.clone());
           }
-        },
+        }
 
-        RawAttributeValue::Script { script, up_to_date, ast } => {
+        RawAttributeValue::Script {
+          script,
+          up_to_date,
+          ast,
+        } => {
           if ast.is_none() || !*up_to_date {
             *ast = Some(engine.compile_expression_with_scope(scope, script).unwrap());
             *up_to_date = true;
@@ -255,7 +263,9 @@ impl CompiledDocument {
     let mut arena = self.elements.write().unwrap();
     let vec: Vec<_> = self.root.descendants(&arena).collect();
     for id in &vec {
-      arena[*id].get_mut().compute_attributes(&self.engine, &mut self.scope.write().unwrap());
+      arena[*id]
+        .get_mut()
+        .compute_attributes(&self.engine, &mut self.scope.write().unwrap());
 
       let node = &arena[*id];
 

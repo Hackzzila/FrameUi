@@ -523,7 +523,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
       .decode(&name)
       .map_err(handle_error_with_location!(self, file_id, reader))?;
 
-    let  mut raw_attributes = dom::RawElementAttributes::default();
+    let mut raw_attributes = dom::RawElementAttributes::default();
     for attr in e.attributes() {
       let attr = attr.map_err(handle_error_with_location!(self, file_id, reader))?;
       let key = reader
@@ -611,7 +611,10 @@ pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(
   let mut buf = Vec::new();
 
   let mut elements = Arena::new();
-  let root = elements.new_node(Element::new(ElementData::Root(RootElement), dom::RawElementAttributes::default()));
+  let root = elements.new_node(Element::new(
+    ElementData::Root(RootElement),
+    dom::RawElementAttributes::default(),
+  ));
 
   let mut ctx = Context {
     body: elements,
