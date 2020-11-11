@@ -27,6 +27,7 @@ pub struct EventHandler<W: Windowing> {
   pub renderer: render::Renderer,
   pub windowing: W,
   pub doc: Arc<CompiledDocument>,
+  render_inner: bool,
 }
 
 impl<W: Windowing> EventHandler<W> {
@@ -36,6 +37,7 @@ impl<W: Windowing> EventHandler<W> {
       windowing,
       renderer,
       doc,
+      render_inner: true,
     }
   }
 
@@ -46,21 +48,19 @@ impl<W: Windowing> EventHandler<W> {
   }
 
   pub fn handle_event(&mut self, event: Event) {
-    let mut render_inner = false;
-
     match event {
       Event::Resized(size) => {
         self.renderer.set_device_size(size);
-        render_inner = true;
+        self.render_inner = true;
       }
 
       Event::ScaleFactorChanged(scale) => {
         self.renderer.set_scale_factor(scale);
-        render_inner = true;
+        self.render_inner = true;
       }
 
       Event::Redraw => {
-        render_inner = true;
+        self.render_inner = true;
       }
 
       Event::Empty => {}
@@ -71,8 +71,10 @@ impl<W: Windowing> EventHandler<W> {
     // }
 
     self.windowing.make_current();
-    self.renderer.render(render_inner, &self.doc);
+    self.renderer.render(self.render_inner, &self.doc);
     self.windowing.swap_buffers();
     self.windowing.make_not_current();
+
+    self.render_inner = false;
   }
 }
