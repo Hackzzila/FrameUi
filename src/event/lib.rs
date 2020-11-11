@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 pub use render::DeviceSize;
 
+#[derive(Debug, Clone)]
 pub enum Event {
   Resized(DeviceSize),
   ScaleFactorChanged(f32),

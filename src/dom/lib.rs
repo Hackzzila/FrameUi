@@ -232,8 +232,7 @@ impl CompiledDocument {
 
   #[must_use]
   pub fn load_from<R: Read>(mut reader: R) -> Self {
-    // Switch to slice once const fns are stable
-    let mut magic_bytes = vec![0; MAGIC_BYTES.len()];
+    let mut magic_bytes = [0; MAGIC_BYTES.len()];
     reader.read_exact(&mut magic_bytes).unwrap();
 
     if magic_bytes != MAGIC_BYTES {

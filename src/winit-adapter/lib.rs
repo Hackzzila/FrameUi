@@ -134,6 +134,10 @@ impl Window {
         self.event_handler.handle_event(event::Event::Redraw);
       }
 
+      glutin::event::Event::UserEvent(_) => {
+        self.event_handler.handle_event(event::Event::Empty);
+      }
+
       _ => {}
     };
   }
