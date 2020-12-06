@@ -6,13 +6,14 @@ use std::{
   path::Path,
 };
 
-use indextree::{Arena, NodeId};
 use quick_xml::events::{BytesStart, Event};
 use reqwest::blocking::{get, Response};
 use url::Url;
 
 use dom::{CompiledDocument, Element, ElementData, RootElement, UnstyledElement};
 use style::StyleSheet;
+
+use dom::tree::Node;
 
 #[path = "style.rs"]
 mod _style;
@@ -76,7 +77,6 @@ pub enum DiagnosticKind<'i> {
   UrlParseError(url::ParseError),
   CssParseError(style::Error<'i>),
   SassParseError(String),
-  MissingNode(NodeId, &'static str, u32, u32),
 }
 
 impl fmt::Display for DiagnosticKind<'_> {
@@ -101,7 +101,6 @@ impl fmt::Display for DiagnosticKind<'_> {
       Self::UrlParseError(e) => e.fmt(f),
       Self::CssParseError(e) => write!(f, "{:?}", e),
       Self::SassParseError(e) => e.fmt(f),
-      Self::MissingNode(node, file, line, col) => write!(f, "missing node `{}`, {}:{}:{} ", node, file, line, col),
     }
   }
 }
@@ -184,8 +183,7 @@ pub trait DiagnosticReporter {
 }
 
 struct Context<'r, FileId: fmt::Debug + Clone> {
-  body: Arena<dom::Element>,
-  root: NodeId,
+  root: Node<Element>,
   reporter: &'r mut dyn DiagnosticReporter<FileId = FileId>,
   stylesheet: StyleSheet,
 }
@@ -204,7 +202,6 @@ macro_rules! handle_error_with_location {
 }
 
 #[macro_export]
-
 macro_rules! handle_error {
   ($reporter:ident) => {
     |e| {
@@ -462,12 +459,12 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
   ) -> Result<(), ()> {
     buf.clear();
 
-    self.compile_ui_element(self.root, reader, buf, url, file_id)
+    self.compile_ui_element(self.root.clone(), reader, buf, url, file_id)
   }
 
   fn compile_ui_element<R: BufRead>(
     &mut self,
-    parent: NodeId,
+    parent: Node<Element>,
     reader: &mut quick_xml::Reader<R>,
     buf: &mut Vec<u8>,
     url: &Url,
@@ -489,7 +486,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
           match name {
             "Unstyled" => {
               let e = e.to_owned();
-              self.compile_unstyled(e, parent, reader, buf, url, file_id)?;
+              self.compile_unstyled(e, parent.clone(), reader, buf, url, file_id)?;
             }
 
             _ => panic!("unknown {}", name),
@@ -510,7 +507,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
   fn compile_unstyled<'a, R: BufRead>(
     &mut self,
     e: BytesStart<'a>,
-    parent: NodeId,
+    parent: Node<Element>,
     reader: &mut quick_xml::Reader<R>,
     buf: &mut Vec<u8>,
     url: &Url,
@@ -585,8 +582,7 @@ impl<'r, FileId: fmt::Debug + Clone> Context<'r, FileId> {
     }
 
     let el = Element::new(ElementData::Unstyled(UnstyledElement), raw_attributes);
-    let node = self.body.new_node(el);
-    parent.append(node, &mut self.body);
+    let node = parent.append(el);
 
     self.compile_ui_element(node, reader, buf, url, file_id)
   }
@@ -610,14 +606,12 @@ pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(
 
   let mut buf = Vec::new();
 
-  let mut elements = Arena::new();
-  let root = elements.new_node(Element::new(
+  let root = Node::new(Element::new(
     ElementData::Root(RootElement),
     dom::RawElementAttributes::default(),
   ));
 
   let mut ctx = Context {
-    body: elements,
     root,
     reporter,
     stylesheet: StyleSheet::new(),
@@ -627,7 +621,7 @@ pub fn compile<URL: IntoUrl, FileId: fmt::Debug + Clone>(
 
   ctx.reporter.checkpoint()?;
 
-  let doc = CompiledDocument::new(ctx.body, ctx.root, ctx.stylesheet);
+  let doc = CompiledDocument::new(ctx.root, ctx.stylesheet);
   doc.init_yoga();
 
   Ok(doc)

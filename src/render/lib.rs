@@ -201,9 +201,8 @@ impl Renderer {
     let spatial_id = root_space_and_clip.spatial_id;
 
     doc.compute_style(self.layout_size.width, self.layout_size.height, yoga::Direction::LTR);
-    let arena = doc.elements.write().unwrap();
-    for id in doc.root.descendants(&arena) {
-      let computed = arena[id].get().get_render();
+    for node in doc.root.descendants() {
+      let computed = node.inner().get_render();
 
       let rect = LayoutRect::new(
         LayoutPoint::new(computed.left, computed.top),

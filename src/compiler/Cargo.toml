@@ -16,7 +16,6 @@ path = "main.rs"
 [dependencies]
 dom = { path = "../dom", features = ["devtools"] }
 dashmap = "3.11"
-indextree = { version = "4.2", features = ["deser"] }
 quick-xml = "0.18"
 reqwest = { version = "0.10.6", features = ["blocking"] }
 url = "2.1.1"

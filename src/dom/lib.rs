@@ -1,6 +1,5 @@
 use std::sync::RwLock;
 
-use indextree::{Arena, Node, NodeId};
 use serde::{Deserialize, Serialize};
 
 //                               [F]rame
@@ -9,6 +8,9 @@ use serde::{Deserialize, Serialize};
 //                                                 [S]tandard
 //                                                       Version
 pub const MAGIC_BYTES: &[u8] = &[0x46, 0x55, 0x69, 0x53, 0];
+
+pub mod tree;
+use tree::Node;
 
 fn safe_yoga_node_new() -> yoga::Node {
   unsafe { yoga::Node::new() }
@@ -190,8 +192,7 @@ pub struct UnstyledElement;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompiledDocument {
-  pub elements: RwLock<Arena<Element>>,
-  pub root: NodeId,
+  pub root: Node<Element>,
   pub stylesheet: style::StyleSheet,
 
   #[serde(skip)]
@@ -203,9 +204,8 @@ pub struct CompiledDocument {
 use std::io::prelude::*;
 
 impl CompiledDocument {
-  pub fn new(elements: Arena<Element>, root: NodeId, stylesheet: style::StyleSheet) -> Self {
+  pub fn new(root: Node<Element>, stylesheet: style::StyleSheet) -> Self {
     Self {
-      elements: RwLock::new(elements),
       root,
       stylesheet,
       engine: rhai::Engine::default(),
@@ -248,47 +248,37 @@ impl CompiledDocument {
     // Even though we don't need mutable access from the rust side,
     // we still want to make sure we are the only one with access to the
     // yoga nodes.
-    let arena = self.elements.write().unwrap();
-    for node in self.root.descendants(&arena).skip(1) {
-      let node = &arena[node];
-      let parent = arena[node.parent().unwrap()].get();
+    for node in self.root.descendants().skip(1) {
+      let inner = node.inner();
+      let parent = inner.parent().unwrap().inner();
       unsafe {
-        parent.yg.insert_child(*node.get().yg, parent.yg.child_count());
+        parent.yg.insert_child(*node.inner().yg, parent.yg.child_count());
       }
     }
   }
 
   pub fn compute_style(&self, width: f32, height: f32, direction: yoga::Direction) {
-    let mut arena = self.elements.write().unwrap();
-    let vec: Vec<_> = self.root.descendants(&arena).collect();
-    for id in &vec {
-      arena[*id]
-        .get_mut()
+    for node in self.root.descendants() {
+      node
+        .inner_mut()
         .compute_attributes(&self.engine, &mut self.scope.write().unwrap());
 
-      let node = &arena[*id];
+      let mut computed = node.inner().computed;
 
-      let mut computed = node.get().computed;
+      self.stylesheet.apply(&node, &mut computed);
 
-      let element = MatchingElement {
-        elements: &*arena,
-        node,
-      };
-
-      self.stylesheet.apply(&element, &mut computed);
-
-      let el = arena[*id].get_mut();
+      let mut el = node.inner_mut();
       el.computed = computed;
       el.prepare_yoga();
     }
 
-    let root = arena[self.root].get_mut();
+    let mut root = self.root.inner_mut();
     unsafe {
       root.yg.calculate_layout(width, height, direction);
     }
   }
 
-  pub fn query_selector(&self, selector: &str) -> Option<NodeId> {
+  pub fn query_selector(&self, selector: &str) -> Option<Node<Element>> {
     let mut input = cssparser::ParserInput::new(selector);
     let list = selectors::SelectorList::parse(
       &style::selectors::SelectorParser,
@@ -303,19 +293,9 @@ impl CompiledDocument {
       selectors::matching::QuirksMode::NoQuirks,
     );
 
-    let arena = self.elements.read().ok()?;
-    for node in arena.iter() {
-      if node.is_removed() {
-        continue;
-      }
-
-      let element = MatchingElement {
-        elements: &*arena,
-        node,
-      };
-
-      if selectors::matching::matches_selector_list(&list, &element, &mut context) {
-        return arena.get_node_id(node);
+    for node in self.root.descendants() {
+      if selectors::matching::matches_selector_list(&list, &node, &mut context) {
+        return Some(node);
       }
     }
 
@@ -326,25 +306,16 @@ impl CompiledDocument {
 impl Drop for CompiledDocument {
   fn drop(&mut self) {
     unsafe {
-      self.elements.get_mut().unwrap()[self.root]
-        .get_mut()
-        .yg
-        .free_recursive();
+      self.root.inner_mut().yg.free_recursive();
     }
   }
 }
 
-#[derive(Debug, Clone)]
-pub struct MatchingElement<'a> {
-  pub elements: &'a Arena<Element>,
-  pub node: &'a Node<Element>,
-}
-
-impl<'a> selectors::Element for MatchingElement<'a> {
+impl selectors::Element for Node<Element> {
   type Impl = style::selectors::SelectorImpl;
 
   fn opaque(&self) -> ::selectors::OpaqueElement {
-    selectors::OpaqueElement::new(self.node)
+    selectors::OpaqueElement::new(self)
   }
 
   fn is_html_slot_element(&self) -> bool {
@@ -360,35 +331,23 @@ impl<'a> selectors::Element for MatchingElement<'a> {
   }
 
   fn parent_element(&self) -> Option<Self> {
-    self.node.parent().map(|parent| Self {
-      elements: self.elements,
-      node: &self.elements[parent],
-    })
+    self.inner().parent().cloned()
   }
 
   fn prev_sibling_element(&self) -> Option<Self> {
-    self.node.previous_sibling().map(|prev| Self {
-      elements: self.elements,
-      node: &self.elements[prev],
-    })
+    self.inner().previous_sibling().cloned()
   }
 
   fn next_sibling_element(&self) -> Option<Self> {
-    self.node.next_sibling().map(|next| Self {
-      elements: self.elements,
-      node: &self.elements[next],
-    })
+    self.inner().next_sibling().cloned()
   }
 
   fn is_empty(&self) -> bool {
-    self.node.first_child().is_none()
+    self.inner().first_child().is_none()
   }
 
   fn is_root(&self) -> bool {
-    match self.node.get().data {
-      ElementData::Root(..) => true,
-      _ => false,
-    }
+    self.inner().parent().is_none()
   }
 
   fn is_html_element_in_html_document(&self) -> bool {
@@ -396,11 +355,11 @@ impl<'a> selectors::Element for MatchingElement<'a> {
   }
 
   fn has_local_name(&self, local_name: &str) -> bool {
-    self.node.get().get_local_name() == local_name
+    self.inner().get_local_name() == local_name
   }
 
   fn has_namespace(&self, ns: &str) -> bool {
-    self.node.get().get_namespace().map_or(false, |node_ns| node_ns == ns)
+    self.inner().get_namespace().map_or(false, |node_ns| node_ns == ns)
   }
 
   fn is_part(&self, _name: &String) -> bool {
@@ -420,8 +379,8 @@ impl<'a> selectors::Element for MatchingElement<'a> {
   }
 
   fn is_same_type(&self, other: &Self) -> bool {
-    let el = self.node.get();
-    let other = other.node.get();
+    let el = self.inner();
+    let other = other.inner();
 
     el.get_local_name() == other.get_local_name() && el.get_namespace() == other.get_namespace()
   }
@@ -432,8 +391,7 @@ impl<'a> selectors::Element for MatchingElement<'a> {
 
   fn has_id(&self, id: &String, case_sensitivity: selectors::attr::CaseSensitivity) -> bool {
     self
-      .node
-      .get()
+      .inner()
       .id
       .as_ref()
       .map_or(false, |id_attr| case_sensitivity.eq(id.as_bytes(), id_attr.as_bytes()))
@@ -441,8 +399,7 @@ impl<'a> selectors::Element for MatchingElement<'a> {
 
   fn has_class(&self, name: &String, case_sensitivity: selectors::attr::CaseSensitivity) -> bool {
     self
-      .node
-      .get()
+      .inner()
       .classes
       .iter()
       .any(|class| case_sensitivity.eq(class.as_bytes(), name.as_bytes()))

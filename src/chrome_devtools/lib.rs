@@ -4,7 +4,6 @@ use devtools_protocol as dt;
 
 use dashmap::DashMap;
 use futures_util::sink::SinkExt;
-use indextree::{Arena, NodeId};
 use log::{error, trace};
 use tokio::{
   net::{TcpListener, TcpStream, ToSocketAddrs},
@@ -145,7 +144,7 @@ impl DevTools {
                       let out = {
                         let view = { Arc::clone(views.get(&idx).unwrap().value()) };
 
-                        let elements = view.elements.read().unwrap();
+                        // let elements = view.elements.read().unwrap();
                         let root = node_from_element(view.root, None, &elements);
 
                         dt::CommandResult {

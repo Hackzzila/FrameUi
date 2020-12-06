@@ -305,7 +305,6 @@ dependencies = [
  "devtools-protocol",
  "dom",
  "futures-util",
- "indextree",
  "log",
  "serde_json",
  "tokio",
@@ -401,7 +400,6 @@ dependencies = [
  "cssparser",
  "dashmap",
  "dom",
- "indextree",
  "quick-xml",
  "reqwest",
  "sass",
@@ -684,7 +682,6 @@ dependencies = [
  "bincode",
  "cssparser",
  "dashmap",
- "indextree",
  "rhai",
  "selectors",
  "serde",
@@ -1221,15 +1218,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c398b2b113b55809ceb9ee3e753fcbac793f1956663f3c36549c1346015c2afe"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "indextree"
-version = "4.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9d50d37aabfa3ff41b0a1bafeaca3514c2410a0658169536d49051bf0edafbc"
-dependencies = [
- "serde",
 ]
 
 [[package]]
