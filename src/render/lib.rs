@@ -175,6 +175,8 @@ impl Renderer {
     let mut txn = Transaction::new();
 
     if inner {
+      // self.api.send_debug_cmd(DebugCommand::SetFlags(DebugFlags::PROFILER_DBG));
+
       let mut builder = DisplayListBuilder::new(self.pipeline_id, self.layout_size);
 
       self.render_inner(&mut builder, &mut txn, doc);

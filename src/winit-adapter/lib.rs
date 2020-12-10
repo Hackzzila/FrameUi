@@ -12,27 +12,33 @@ use webrender::api::*;
 
 pub use glutin;
 
-pub struct Notifier {
-  events_proxy: EventLoopProxy<()>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ProxyEvent<T> {
+  WakeUp(WindowId),
+  User(T),
 }
 
-impl Notifier {
-  pub fn new(events_proxy: EventLoopProxy<()>) -> Notifier {
-    Notifier { events_proxy }
+pub struct Notifier<T: Send + Sync + 'static> {
+  window: WindowId,
+  events_proxy: EventLoopProxy<ProxyEvent<T>>,
+}
+
+impl<T: Send + Sync + 'static> Notifier<T> {
+  pub fn new(window: WindowId, events_proxy: EventLoopProxy<ProxyEvent<T>>) -> Notifier<T> {
+    Notifier { window, events_proxy }
   }
 }
 
-impl RenderNotifier for Notifier {
+impl<T: Send + Sync + 'static> RenderNotifier for Notifier<T> {
   fn clone(&self) -> Box<dyn RenderNotifier> {
     Box::new(Notifier {
+      window: self.window,
       events_proxy: self.events_proxy.clone(),
     })
   }
 
   fn wake_up(&self) {
-    #[cfg(not(target_os = "android"))]
-    // let _ = self.events_proxy.wakeup();
-    let _ = self.events_proxy.send_event(());
+    let _ = self.events_proxy.send_event(ProxyEvent::WakeUp(self.window));
   }
 
   fn new_frame_ready(&self, _: DocumentId, _scrolled: bool, _composite_needed: bool, _render_time: Option<u64>) {
@@ -46,10 +52,10 @@ pub struct Window {
 }
 
 impl Window {
-  pub fn new<TE>(
+  pub fn new<T: Send + Sync + 'static>(
     wb: WindowBuilder,
-    el: &EventLoopWindowTarget<TE>,
-    notifier: Box<dyn RenderNotifier>,
+    el: &EventLoopWindowTarget<ProxyEvent<T>>,
+    ep: EventLoopProxy<ProxyEvent<T>>,
     doc: Arc<CompiledDocument>,
   ) -> Self {
     let windowed_context = ContextBuilder::new()
@@ -71,8 +77,6 @@ impl Window {
       render::DeviceSize::new(size.width as i32, size.height as i32)
     };
 
-    // let notifier = Box::new(Notifier::new(self.proxy.clone()));
-
     let gl = match windowed_context.get_api() {
       glutin::Api::OpenGl => unsafe {
         gl::GlFns::load_with(|symbol| windowed_context.get_proc_address(symbol) as *const _)
@@ -89,12 +93,16 @@ impl Window {
     };
     windowing_impl.make_current();
 
-    let renderer = render::Renderer::new(gl, device_pixel_ratio, device_size, notifier);
+    let renderer = render::Renderer::new(
+      gl,
+      device_pixel_ratio,
+      device_size,
+      Box::new(Notifier::new(window_id, ep)),
+    );
 
     Self {
       window_id,
       event_handler: event::EventHandler::new(windowing_impl, renderer, doc),
-      // renderer: render::Renderer::new(windowing_impl, gl, device_pixel_ratio, device_size, notifier),
     }
   }
 

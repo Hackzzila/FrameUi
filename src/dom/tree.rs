@@ -144,9 +144,7 @@ impl<T> std::iter::Iterator for Children<T> {
 
   fn next(&mut self) -> Option<Node<T>> {
     let current = self.current.clone();
-    self.current = current
-      .as_ref()
-      .and_then(|x| x.inner().next_sibling().cloned());
+    self.current = current.as_ref().and_then(|x| x.inner().next_sibling().cloned());
     current
   }
 }

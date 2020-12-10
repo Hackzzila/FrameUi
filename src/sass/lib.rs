@@ -4,7 +4,7 @@ pub mod sys {
   #![allow(non_snake_case)]
   #![allow(clippy::all)]
   #![allow(clippy::pedantic)]
-  #![allow(clippy::caego)]
+  #![allow(clippy::cargo)]
 
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }

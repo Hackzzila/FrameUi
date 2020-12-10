@@ -21,15 +21,15 @@ fn main() {
   // let mut devtools = chrome_devtools::DevTools::new("127.0.0.1:4000");
   // devtools.add_view(Arc::clone(&doc));
 
-  let event_loop = glutin::event_loop::EventLoop::new();
+  let event_loop = glutin::event_loop::EventLoop::with_user_event();
 
-  let notifier = Box::new(window::Notifier::new(event_loop.create_proxy()));
-  let window = window::Window::new(
+  // let notifier = Box::new(window::Notifier::new());
+  let window = window::Window::new::<()>(
     glutin::window::WindowBuilder::new()
       .with_title("Foo")
       .with_inner_size(glutin::dpi::LogicalSize::new(1920, 1080)),
     &event_loop,
-    notifier,
+    event_loop.create_proxy(),
     Arc::clone(&doc),
   );
 
@@ -38,7 +38,7 @@ fn main() {
   event_loop.run(move |event, _, control_flow| {
     *control_flow = glutin::event_loop::ControlFlow::Wait;
 
-    // println!("{:?}", event);
+    println!("{:?}", event);
 
     match &event {
       glutin::event::Event::WindowEvent { event, .. } => match event {
